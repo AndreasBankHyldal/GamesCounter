@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { SUIT_SYMBOL, type Suit } from "@/lib/games";
 import {
   computeStandings,
+  gabongHundredHits,
   makeRound,
   pirateRoundInfo,
   pirateStartCards,
+  type HundredHit,
   type Round,
 } from "@/lib/scoring";
 import {
@@ -19,6 +21,7 @@ import {
   type GameStatus,
 } from "@/lib/sessions";
 import { Avatar } from "./Avatar";
+import { HundredPopup } from "./HundredPopup";
 import { RoundSheet } from "./RoundSheet";
 
 type Editing = { index: number } | "new" | null;
@@ -39,6 +42,7 @@ export function GameScreen({
     undefined
   );
   const [editing, setEditing] = useState<Editing>(null);
+  const [popupHits, setPopupHits] = useState<HundredHit[] | null>(null);
 
   useEffect(() => {
     setSession(getSession(sessionId) ?? null);
@@ -86,11 +90,19 @@ export function GameScreen({
     );
   };
 
+  const checkHundred = (priorRounds: Round[], scores: Record<string, number>) => {
+    if (slug !== "gabong") return;
+    const hits = gabongHundredHits(players, priorRounds, scores);
+    if (hits.length) setPopupHits(hits);
+  };
+
   const saveRound = (index: number, scores: Record<string, number>) => {
+    checkHundred(rounds.slice(0, index), scores);
     commitRounds(rounds.map((r, i) => (i === index ? { ...r, scores } : r)));
     setEditing(null);
   };
   const addRound = (scores: Record<string, number>) => {
+    checkHundred(rounds, scores);
     commitRounds([...rounds, makeRound(scores)]);
     setEditing(null);
   };
@@ -294,6 +306,14 @@ export function GameScreen({
               ? () => deleteRound(editing.index)
               : undefined
           }
+        />
+      )}
+
+      {popupHits && (
+        <HundredPopup
+          hits={popupHits}
+          players={players}
+          onClose={() => setPopupHits(null)}
         />
       )}
     </main>

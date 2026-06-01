@@ -36,6 +36,33 @@ function isExactHundred(value: number): boolean {
   return value > 0 && value % 100 === 0;
 }
 
+export interface HundredHit {
+  playerId: string;
+  landedOn: number;
+  halvedTo: number;
+}
+
+/**
+ * Players who land exactly on a multiple of 100 (and get halved) when the
+ * given round's scores are applied on top of the rounds before it.
+ * `priorRounds` is everything before the round being entered/edited.
+ */
+export function gabongHundredHits(
+  players: Player[],
+  priorRounds: Round[],
+  roundScores: Record<string, number>
+): HundredHit[] {
+  const prior = computeStandings("gabong", players, priorRounds).totals;
+  const hits: HundredHit[] = [];
+  for (const p of players) {
+    const landedOn = (prior[p.id] ?? 0) + (roundScores[p.id] ?? 0);
+    if (isExactHundred(landedOn)) {
+      hits.push({ playerId: p.id, landedOn, halvedTo: landedOn / 2 });
+    }
+  }
+  return hits;
+}
+
 export function computeStandings(
   slug: string,
   players: Player[],
