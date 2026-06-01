@@ -22,7 +22,15 @@ import {
 } from "@/lib/sessions";
 import { Avatar } from "./Avatar";
 import { HundredPopup } from "./HundredPopup";
+import { ResultPopup } from "./ResultPopup";
 import { RoundSheet } from "./RoundSheet";
+
+interface ResultInfo {
+  emoji: string;
+  title: string;
+  caption: string;
+  highlightIds: string[];
+}
 
 type Editing = { index: number } | "new" | null;
 
@@ -43,6 +51,7 @@ export function GameScreen({
   );
   const [editing, setEditing] = useState<Editing>(null);
   const [popupHits, setPopupHits] = useState<HundredHit[] | null>(null);
+  const [resultPopup, setResultPopup] = useState<ResultInfo | null>(null);
 
   useEffect(() => {
     setSession(getSession(sessionId) ?? null);
@@ -84,10 +93,37 @@ export function GameScreen({
     return rs.length > 0 && rs.every(roundComplete) ? "finished" : "active";
   };
 
+  const buildResult = (rs: Round[]): ResultInfo | null => {
+    const s = computeStandings(slug, players, rs);
+    if (slug === "gabong") {
+      if (!s.loserIds.length) return null;
+      return {
+        emoji: "💥",
+        title: "Game over",
+        caption: `${s.loserIds.map(nameOf).join(", ")} busted past 500 and loses`,
+        highlightIds: s.loserIds,
+      };
+    }
+    if (!s.winnerIds.length) return null;
+    return {
+      emoji: "🏆",
+      title: s.winnerIds.length > 1 ? "Winners!" : "Winner!",
+      caption: slug === "500" ? "First to 500 points!" : "Highest score wins",
+      highlightIds: s.winnerIds,
+    };
+  };
+
   const commitRounds = (rs: Round[]) => {
-    setSession(
-      upsertSession({ ...session, rounds: rs, status: recomputeStatus(rs) })
-    );
+    const newStatus = recomputeStatus(rs);
+    // Celebrate the moment the game transitions to finished.
+    if (session.status !== "finished" && newStatus === "finished") {
+      const result = buildResult(rs);
+      if (result) {
+        setPopupHits(null);
+        setResultPopup(result);
+      }
+    }
+    setSession(upsertSession({ ...session, rounds: rs, status: newStatus }));
   };
 
   const checkHundred = (priorRounds: Round[], scores: Record<string, number>) => {
@@ -309,11 +345,22 @@ export function GameScreen({
         />
       )}
 
-      {popupHits && (
+      {popupHits && !resultPopup && (
         <HundredPopup
           hits={popupHits}
           players={players}
           onClose={() => setPopupHits(null)}
+        />
+      )}
+
+      {resultPopup && (
+        <ResultPopup
+          emoji={resultPopup.emoji}
+          title={resultPopup.title}
+          caption={resultPopup.caption}
+          players={players}
+          highlightIds={resultPopup.highlightIds}
+          onClose={() => setResultPopup(null)}
         />
       )}
     </main>
