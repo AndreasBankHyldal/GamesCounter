@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+:root {
+  /* Poker-felt greens */
+  --felt-center: #1a7d44;
+  --felt-mid: #0c5e30;
+  --felt-edge: #063e20;
+
+  /* Card-table reds */
+  --card-red: #b8232f;
+  --card-red-dark: #8e1a23;
+  --card-red-light: #d94a52;
+
+  --foreground: #f4f1e8;
+}
+
+@theme inline {
+  --color-felt-center: var(--felt-center);
+  --color-felt-mid: var(--felt-mid);
+  --color-felt-edge: var(--felt-edge);
+  --color-card-red: var(--card-red);
+  --color-card-red-dark: var(--card-red-dark);
+  --color-card-red-light: var(--card-red-light);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- Poker table felt ---------------------------------------------------- */
+.felt {
+  background-color: var(--felt-mid);
+  background-image:
+    /* fine grain noise */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+    /* soft spotlight from the center */
+    radial-gradient(
+      ellipse 120% 90% at 50% 32%,
+      var(--felt-center) 0%,
+      var(--felt-mid) 45%,
+      var(--felt-edge) 100%
+    );
+  background-blend-mode: soft-light, normal;
+}
+
+/* Subtle stitched ring like a real card table edge */
+.felt::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 12rem rgba(0, 0, 0, 0.45);
+}
+
+/* ---- Red card-style buttons --------------------------------------------- */
+.game-card {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(
+    160deg,
+    var(--card-red-light) 0%,
+    var(--card-red) 42%,
+    var(--card-red-dark) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 10px 24px -8px rgba(0, 0, 0, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    filter 0.15s ease;
+}
+
+.game-card:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.3) inset,
+    0 16px 30px -8px rgba(0, 0, 0, 0.6),
+    0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.game-card:active {
+  transform: translateY(-1px);
+}
+
+/* Large translucent suit watermark behind the label */
+.game-card__watermark {
+  position: absolute;
+  right: -0.25rem;
+  bottom: -1.5rem;
+  font-size: 7rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+  user-select: none;
+}
+
+.suit-red {
+  color: var(--card-red);
+}
+.suit-black {
+  color: #1a1a1a;
+}
