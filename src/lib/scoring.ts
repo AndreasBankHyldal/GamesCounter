@@ -24,9 +24,17 @@ export function pirateStartCards(playerCount: number): number {
   return Math.max(1, Math.floor(PIRATE_DECK / Math.max(1, playerCount)));
 }
 
-/** Cards to deal and who deals for a given Pirate Bridge round index (0-based). */
-export function pirateRoundInfo(players: Player[], roundIndex: number) {
-  const cards = pirateStartCards(players.length) - roundIndex;
+/**
+ * Cards to deal and who deals for a given Pirate Bridge round index (0-based).
+ * `totalRounds` is the game's round count (= its starting card count), which
+ * may be lower than the deck default for a shorter match.
+ */
+export function pirateRoundInfo(
+  players: Player[],
+  roundIndex: number,
+  totalRounds: number
+) {
+  const cards = totalRounds - roundIndex;
   const dealer = players[roundIndex % players.length];
   return { cards, dealer };
 }

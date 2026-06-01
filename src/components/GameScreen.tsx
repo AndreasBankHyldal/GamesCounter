@@ -9,7 +9,6 @@ import {
   gabongHundredHits,
   makeRound,
   pirateRoundInfo,
-  pirateStartCards,
   type HundredHit,
   type Round,
 } from "@/lib/scoring";
@@ -178,18 +177,20 @@ export function GameScreen({
   } else if (slug === "gabong") {
     banner = "Avoid hitting 500 — that player loses";
   } else {
-    const total = pirateStartCards(players.length);
+    const total = rounds.length;
     const done = rounds.filter(roundComplete).length;
     banner = `Round ${Math.min(done + 1, total)} of ${total}`;
   }
 
   const roundLabel = (i: number) => {
     if (!isPirate) return `Round ${i + 1}`;
-    const { cards } = pirateRoundInfo(players, i);
+    const { cards } = pirateRoundInfo(players, i, rounds.length);
     return `${cards} ${cards === 1 ? "card" : "cards"}`;
   };
   const roundSubtitle = (i: number) =>
-    isPirate ? `Deal: ${pirateRoundInfo(players, i).dealer?.name ?? "?"}` : undefined;
+    isPirate
+      ? `Deal: ${pirateRoundInfo(players, i, rounds.length).dealer?.name ?? "?"}`
+      : undefined;
 
   const editingScores =
     editing && editing !== "new" ? rounds[editing.index].scores : {};
