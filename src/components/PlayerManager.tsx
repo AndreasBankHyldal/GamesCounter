@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { createPlayer, type Player } from "@/lib/players";
 import { Avatar } from "./Avatar";
 import { AvatarPicker } from "./AvatarPicker";
 
 export function PlayerManager({
   onStart,
+  belowPlayers,
 }: {
   /** Called with the finalised roster when the user starts the game. */
   onStart: (players: Player[]) => void;
+  /** Optional per-game config rendered just above the Start button. */
+  belowPlayers?: (players: Player[]) => ReactNode;
 }) {
   // Players are intentionally not persisted — each new game starts blank.
   const [players, setPlayers] = useState<Player[]>([]);
@@ -106,6 +109,8 @@ export function PlayerManager({
       <p className="mt-3 text-center text-xs text-white/40">
         Tap an avatar to change its look.
       </p>
+
+      {belowPlayers?.(players)}
 
       <button
         type="button"

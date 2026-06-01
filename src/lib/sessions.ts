@@ -75,12 +75,19 @@ function autoName(players: Player[], ts: number): string {
   return `${date} · ${names}`;
 }
 
-export function createSession(slug: string, players: Player[]): GameSession {
+export function createSession(
+  slug: string,
+  players: Player[],
+  startCards?: number
+): GameSession {
   const now = Date.now();
   // Pirate Bridge has a fixed schedule of rounds; pre-create them empty.
+  // The starting card count is clamped to [1, deck max] for a shorter match.
+  const max = pirateStartCards(players.length);
+  const count = Math.max(1, Math.min(startCards ?? max, max));
   const rounds: Round[] =
     slug === "piratbridge"
-      ? Array.from({ length: pirateStartCards(players.length) }, () => makeRound())
+      ? Array.from({ length: count }, () => makeRound())
       : [];
 
   const session: GameSession = {
