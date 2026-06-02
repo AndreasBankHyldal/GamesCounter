@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BoardProps } from "boardgame.io/react";
 import {
   cardValue,
@@ -20,6 +20,9 @@ import {
 } from "@gamescounter/games";
 import { Avatar } from "@/components/Avatar";
 import { getRoom } from "@/lib/multiplayer/lobby";
+import { playTurnChime } from "@/lib/multiplayer/sound";
+
+const SOUND_KEY = "gc:mp:sound";
 
 type Props = BoardProps<FiveHundredState>;
 
@@ -56,6 +59,24 @@ export function FiveHundredBoard({
   const [error, setError] = useState<string | null>(null);
   const [peek, setPeek] = useState(false);
   const [avatars, setAvatars] = useState<Record<string, AvatarInfo>>({});
+  const [soundOn, setSoundOn] = useState(true);
+  const wasMyTurn = useRef(false);
+
+  // Load the sound preference after mount (avoids SSR mismatch).
+  useEffect(() => {
+    setSoundOn(window.localStorage.getItem(SOUND_KEY) !== "off");
+  }, []);
+  function toggleSound() {
+    setSoundOn((on) => {
+      const next = !on;
+      try {
+        window.localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   // Fetch chosen avatars from the match metadata once (and on player changes).
   useEffect(() => {
@@ -101,6 +122,13 @@ export function FiveHundredBoard({
   const myTurn = isActive;
   const gameover = ctx.gameover as { winner?: string; scores?: Record<string, number> } | undefined;
   const paused = G.roundOver || Boolean(gameover);
+
+  // Chime when it becomes your turn (rising edge of an active, non-paused turn).
+  const myTurnActive = myTurn && !paused;
+  useEffect(() => {
+    if (myTurnActive && !wasMyTurn.current && soundOn) playTurnChime();
+    wasMyTurn.current = myTurnActive;
+  }, [myTurnActive, soundOn]);
 
   function toggleSelect(id: string) {
     setError(null);
@@ -208,10 +236,23 @@ export function FiveHundredBoard({
     <div className="felt flex min-h-screen flex-col gap-4 px-4 pb-8 pt-14 text-white">
       {/* Status bar (pushed below the Leave button) */}
       <div className="flex items-center justify-between text-sm">
-        <span className="rounded-full bg-black/30 px-3 py-1 font-semibold">Round {G.roundNumber}</span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-black/30 px-3 py-1 font-semibold">
+            Round {G.roundNumber}
+          </span>
+          <button
+            type="button"
+            onClick={toggleSound}
+            title={soundOn ? "Mute turn sound" : "Unmute turn sound"}
+            aria-label={soundOn ? "Mute turn sound" : "Unmute turn sound"}
+            className="rounded-full bg-black/30 px-2 py-1 text-base leading-none"
+          >
+            {soundOn ? "🔔" : "🔕"}
+          </button>
+        </div>
         <span
           className={`rounded-full px-3 py-1 font-semibold ${
-            myTurn && !paused ? "bg-amber-400 text-black" : "bg-black/30 text-white/80"
+            myTurnActive ? "animate-pulse bg-amber-400 text-black ring-2 ring-amber-200" : "bg-black/30 text-white/80"
           }`}
         >
           {gameover
@@ -221,7 +262,7 @@ export function FiveHundredBoard({
               : myTurn
                 ? G.hasDrawn
                   ? "Your move"
-                  : "Draw a card"
+                  : "Your turn — draw"
                 : `${nameFor(ctx.currentPlayer)}'s turn`}
         </span>
         <span className={`text-xs ${isConnected ? "text-emerald-300" : "text-rose-300"}`}>
