@@ -20,7 +20,19 @@ import {
 } from "@gamescounter/games";
 import { Avatar } from "@/components/Avatar";
 import { getRoom } from "@/lib/multiplayer/lobby";
-import { playTurnChime } from "@/lib/multiplayer/sound";
+import {
+  playAdd,
+  playClose,
+  playDeal,
+  playDiscard,
+  playDraw,
+  playMeld,
+  playPass,
+  playPile,
+  playSwap,
+  playTurnChime,
+  playWin,
+} from "@/lib/multiplayer/sound";
 
 const SOUND_KEY = "gc:mp:sound";
 
@@ -130,6 +142,30 @@ export function FiveHundredBoard({
     wasMyTurn.current = myTurnActive;
   }, [myTurnActive, soundOn]);
 
+  /** Play a sound effect, unless the player has muted. */
+  const sfx = (fn: () => void) => {
+    if (soundOn) fn();
+  };
+
+  // Victory fanfare when the game ends.
+  const isOver = Boolean(gameover);
+  const wasOver = useRef(false);
+  useEffect(() => {
+    if (isOver && !wasOver.current && soundOn) playWin();
+    wasOver.current = isOver;
+  }, [isOver, soundOn]);
+
+  // Keep the selection in sync with your hand: when cards leave (a successful
+  // meld/discard) they drop out of the selection automatically; if a move is
+  // rejected and reverted, the cards return and the selection is preserved so
+  // you can simply try again.
+  useEffect(() => {
+    setSelected((sel) => {
+      const next = sel.filter((id) => myHand.some((c) => c.id === id));
+      return next.length === sel.length ? sel : next;
+    });
+  }, [myHand]);
+
   function toggleSelect(id: string) {
     setError(null);
     setSelected((prev) =>
@@ -183,29 +219,29 @@ export function FiveHundredBoard({
     if (!jokersDeclared()) return setError("Declare what each joker represents.");
     const res = validateNewMeld(selectedCards, declarations, me, "preview");
     if (!res.ok) return setError(res.error ?? "That isn't a valid run.");
+    sfx(playMeld);
     moves.playMeld(selected, declarations);
-    clearSelection();
   }
 
   function doAddToTable() {
     if (!extendableMeld) return setError("Those cards don't extend any run on the table.");
+    sfx(playAdd);
     moves.extendMeld(extendableMeld.id, selected, declarations);
-    clearSelection();
   }
 
   function doDiscard() {
     if (selected.length !== 1) return setError("Select exactly one card to discard.");
+    sfx(playDiscard);
     moves.discard(selected[0]);
-    clearSelection();
   }
   function doClose() {
     if (myHand.length !== 1) return;
+    sfx(playClose);
     moves.closeHand(myHand[0].id);
-    clearSelection();
   }
   function doPass() {
+    sfx(playPass);
     moves.passTurn();
-    clearSelection();
   }
 
   function canSwap(placed: PlacedCard): boolean {
@@ -326,14 +362,17 @@ export function FiveHundredBoard({
               {myTurn ? (
                 <button
                   type="button"
-                  onClick={() => moves.nextRound()}
+                  onClick={() => {
+                    sfx(playDeal);
+                    moves.nextRound();
+                  }}
                   className="game-card rounded-xl px-5 py-3 text-sm font-bold text-white"
                 >
                   Continue to next round
                 </button>
               ) : (
                 <p className="text-sm text-white/60">
-                  Waiting for {G.closedBy ? nameFor(G.closedBy) : "the next round"}…
+                  Waiting for the game leader to start the next round…
                 </p>
               )}
             </div>
@@ -379,7 +418,10 @@ export function FiveHundredBoard({
           <button
             type="button"
             disabled={!canDraw}
-            onClick={() => moves.drawFromStock()}
+            onClick={() => {
+              sfx(playDraw);
+              moves.drawFromStock();
+            }}
             className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-30"
           >
             Draw deck
@@ -398,7 +440,10 @@ export function FiveHundredBoard({
             <button
               type="button"
               disabled={!canDraw || G.faceUp.length === 0}
-              onClick={() => moves.drawFromFaceUp()}
+              onClick={() => {
+                sfx(playDraw);
+                moves.drawFromFaceUp();
+              }}
               className="rounded-lg bg-white/15 px-2 py-1.5 text-xs font-semibold disabled:opacity-30"
             >
               Take 1
@@ -411,7 +456,10 @@ export function FiveHundredBoard({
                   ? "Opens once everyone has had a turn"
                   : "Take the whole pile (then meld or −50)"
               }
-              onClick={() => moves.takeFaceUpPile()}
+              onClick={() => {
+                sfx(playPile);
+                moves.takeFaceUpPile();
+              }}
               className="rounded-lg bg-white/15 px-2 py-1.5 text-xs font-semibold disabled:opacity-30"
             >
               Take pile ({G.faceUp.length})
@@ -470,7 +518,10 @@ export function FiveHundredBoard({
                             {myTurn && !paused && canSwap(placed) && (
                               <button
                                 type="button"
-                                onClick={() => moves.swapJoker(meld.id, idx)}
+                                onClick={() => {
+                                  sfx(playSwap);
+                                  moves.swapJoker(meld.id, idx);
+                                }}
                                 className="mt-0.5 rounded bg-emerald-500/30 px-1 text-[10px] font-semibold"
                               >
                                 swap
