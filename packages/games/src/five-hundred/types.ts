@@ -49,6 +49,8 @@ export interface FiveHundredState {
   melds: Meld[];
   /** Cumulative scores across rounds. */
   scores: Record<PlayerID, number>;
+  /** Number of jokers in the deck (0–4), chosen at match creation. */
+  jokers: number;
   roundNumber: number;
   /** Turns taken so far in the current hand (resets each deal). Melding only
    * opens once this exceeds the player count — i.e. everyone has had one turn. */

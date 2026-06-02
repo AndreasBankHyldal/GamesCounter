@@ -16,8 +16,8 @@ const PILE_PENALTY = 50;
 type Shuffle = <T>(items: T[]) => T[];
 
 /** Deal a fresh round: 7 cards each, one card flipped face-up, rest face-down. */
-function dealRound(playerIDs: PlayerID[], shuffle: Shuffle) {
-  const deck = shuffle(buildDeck());
+function dealRound(playerIDs: PlayerID[], shuffle: Shuffle, jokers: number) {
+  const deck = shuffle(buildDeck(jokers));
   const hands: Record<PlayerID, Card[]> = {};
   let i = 0;
   for (const id of playerIDs) {
@@ -42,14 +42,25 @@ export function meldingOpen(turnsThisRound: number, numPlayers: number): boolean
   return turnsThisRound > numPlayers;
 }
 
-export const FiveHundred: Game<FiveHundredState> = {
+/** Match-creation options chosen by the host. */
+export interface FiveHundredSetupData {
+  jokers?: number;
+}
+
+export const FiveHundred: Game<
+  FiveHundredState,
+  Record<string, unknown>,
+  FiveHundredSetupData
+> = {
   name: "five-hundred",
   minPlayers: 2,
   maxPlayers: 6,
 
-  setup: ({ ctx, random }) => {
+  setup: ({ ctx, random }, setupData) => {
     const playerIDs = ctx.playOrder;
-    const { hands, stock, faceUp } = dealRound(playerIDs, (a) => random.Shuffle(a));
+    // Host picks the joker count (0–4) when creating the match; default 2.
+    const jokers = Math.max(0, Math.min(4, Math.floor(setupData?.jokers ?? 2)));
+    const { hands, stock, faceUp } = dealRound(playerIDs, (a) => random.Shuffle(a), jokers);
     const scores: Record<PlayerID, number> = Object.fromEntries(
       playerIDs.map((id) => [id, 0])
     );
@@ -59,6 +70,7 @@ export const FiveHundred: Game<FiveHundredState> = {
       hands,
       melds: [],
       scores,
+      jokers,
       roundNumber: 1,
       turnsThisRound: 0,
       closedBy: null,
@@ -280,7 +292,7 @@ export const FiveHundred: Game<FiveHundredState> = {
     nextRound: ({ G, ctx, random, events }) => {
       if (!G.roundOver || G.finished) return INVALID_MOVE;
       const playerIDs = Object.keys(G.hands);
-      const next = dealRound(playerIDs, (a) => random.Shuffle(a));
+      const next = dealRound(playerIDs, (a) => random.Shuffle(a), G.jokers);
       G.hands = next.hands;
       G.stock = next.stock;
       G.faceUp = next.faceUp;
