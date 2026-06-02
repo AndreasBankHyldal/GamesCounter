@@ -54,6 +54,7 @@ export const FiveHundred: Game<FiveHundredState> = {
       roundNumber: 1,
       closedBy: null,
       closingCard: null,
+      roundOver: false,
       finished: false,
       lastRound: null,
       lastDrawnId: null,
@@ -221,7 +222,8 @@ export const FiveHundred: Game<FiveHundredState> = {
       events.endTurn();
     },
 
-    // Close the hand: place your final card face-down on the pile and win.
+    // Close the hand: place your final card face-down on the pile, ending the
+    // round. The round is scored (+melds on the table, −cards left in hand).
     closeHand: ({ G, ctx, playerID }, cardId: string) => {
       if (!G.hasDrawn) return INVALID_MOVE;
       const hand = G.hands[playerID];
@@ -237,18 +239,48 @@ export const FiveHundred: Game<FiveHundredState> = {
       G.hands[playerID] = [];
       G.closingCard = card; // sits face-down on the pile; others may peek
       G.closedBy = playerID;
-      G.finished = true;
       const result = scoreRound(G, ctx.playOrder, playerID);
       for (const id of ctx.playOrder) G.scores[id] += result.deltas[id] ?? 0;
       G.lastRound = result;
-      G.log.push(`${tag(playerID)} closed the hand and won!`);
-      // endIf ends the game.
+      G.log.push(`${tag(playerID)} closed round ${G.roundNumber}.`);
+
+      // Game ends once anyone reaches the winning score; otherwise pause for a
+      // "continue to next round" from the player who closed.
+      if (ctx.playOrder.some((id) => G.scores[id] >= WIN_SCORE)) {
+        G.finished = true;
+        G.log.push(`Someone reached ${WIN_SCORE} — game over.`);
+      } else {
+        G.roundOver = true;
+      }
+    },
+
+    // Deal the next round (after a close, when nobody has won yet).
+    nextRound: ({ G, random, events }) => {
+      if (!G.roundOver || G.finished) return INVALID_MOVE;
+      const playerIDs = Object.keys(G.hands);
+      const next = dealRound(playerIDs, (a) => random.Shuffle(a));
+      G.hands = next.hands;
+      G.stock = next.stock;
+      G.faceUp = next.faceUp;
+      G.melds = [];
+      G.closingCard = null;
+      G.closedBy = null;
+      G.roundOver = false;
+      G.lastRound = null;
+      G.roundNumber += 1;
+      G.log.push(`Round ${G.roundNumber} dealt.`);
+      events.endTurn(); // next round starts with the following player
     },
   },
 
-  endIf: ({ G }) => {
-    if (!G.finished || G.closedBy === null) return;
-    return { winner: G.closedBy, scores: G.scores };
+  endIf: ({ G, ctx }) => {
+    if (!G.finished) return;
+    // Highest cumulative score wins.
+    let winner = ctx.playOrder[0];
+    for (const id of ctx.playOrder) {
+      if (G.scores[id] > G.scores[winner]) winner = id;
+    }
+    return { winner, scores: G.scores };
   },
 
   // Hide secret state from each client: other players' hands and the face-down

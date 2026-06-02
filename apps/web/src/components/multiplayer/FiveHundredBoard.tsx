@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BoardProps } from "boardgame.io/react";
 import {
   cardValue,
@@ -18,8 +18,12 @@ import {
   type PlacedCard,
   type Suit,
 } from "@gamescounter/games";
+import { Avatar } from "@/components/Avatar";
+import { getRoom } from "@/lib/multiplayer/lobby";
 
 type Props = BoardProps<FiveHundredState>;
+
+type AvatarInfo = { styleKey: string; seed: string };
 
 const SUIT_ORDER: Record<Suit, number> = { spade: 0, heart: 1, club: 2, diamond: 3 };
 
@@ -36,7 +40,6 @@ function isRed(card: Card): boolean {
   return !card.isJoker && SUIT_COLOR[card.suit as Suit] === "red";
 }
 
-/** Label for a placed joker showing the real card it represents. */
 function placedJokerLabel(placed: PlacedCard): string {
   const rank = placed.asRank === 14 ? 1 : placed.asRank;
   return `${RANK_LABEL[rank] ?? rank}${SUIT_SYMBOL[placed.asSuit]}`;
@@ -47,6 +50,7 @@ export function FiveHundredBoard({
   ctx,
   moves,
   playerID,
+  matchID,
   matchData,
   isActive,
   isConnected,
@@ -57,9 +61,35 @@ export function FiveHundredBoard({
   const [aceHigh, setAceHigh] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [peek, setPeek] = useState(false);
+  const [avatars, setAvatars] = useState<Record<string, AvatarInfo>>({});
+
+  // Fetch chosen avatars from the match metadata once (and on player changes).
+  useEffect(() => {
+    let cancelled = false;
+    getRoom(matchID)
+      .then((room) => {
+        if (cancelled) return;
+        const map: Record<string, AvatarInfo> = {};
+        for (const p of room.players) {
+          if (p.data?.avatarStyle && p.data?.avatarSeed) {
+            map[String(p.id)] = { styleKey: p.data.avatarStyle, seed: p.data.avatarSeed };
+          }
+        }
+        setAvatars(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [matchID, matchData]);
 
   const myHand = useMemo(() => sortHand(G.hands[me] ?? []), [G.hands, me]);
   const others = ctx.playOrder.filter((id) => id !== me);
+
+  // When you draw, the new card comes in pre-selected (as if you tapped it).
+  useEffect(() => {
+    if (G.lastDrawnId) setSelected([G.lastDrawnId]);
+  }, [G.lastDrawnId]);
 
   function nameFor(pid: string): string {
     const entry = matchData?.find((p) => String(p.id) === pid);
@@ -68,7 +98,6 @@ export function FiveHundredBoard({
   function handCount(pid: string): number {
     return G.handCounts?.[pid] ?? G.hands[pid]?.length ?? 0;
   }
-  // Replace `@@<id>@@` tokens in log lines with the player's display name.
   function renderLog(line: string): string {
     return line.replace(/@@(\d+)@@/g, (_, id) => nameFor(id));
   }
@@ -80,6 +109,7 @@ export function FiveHundredBoard({
   const hasAce = selectedCards.some((c) => !c.isJoker && c.rank === 1);
   const myTurn = isActive;
   const gameover = ctx.gameover as { winner?: string; scores?: Record<string, number> } | undefined;
+  const paused = G.roundOver || Boolean(gameover);
 
   function toggleSelect(id: string) {
     setError(null);
@@ -110,30 +140,27 @@ export function FiveHundredBoard({
     return selectedCards.every((c) => !c.isJoker || jokerDecl[c.id]);
   }
 
+  // The meld (if any) that the current selection can legally extend.
+  const declarations = buildDeclarations();
+  const extendableMeld =
+    selectedCards.length >= 1 && jokersDeclared()
+      ? G.melds.find((m) => validateExtend(m, selectedCards, declarations, me).ok)
+      : undefined;
+
   // ---- Move dispatch (with client-side pre-validation for instant feedback) ----
   function doMeld() {
     if (selectedCards.length < 3) return setError("Pick at least 3 cards.");
     if (!jokersDeclared()) return setError("Declare what each joker represents.");
-    const decls = buildDeclarations();
-    const res = validateNewMeld(selectedCards, decls, me, "preview");
+    const res = validateNewMeld(selectedCards, declarations, me, "preview");
     if (!res.ok) return setError(res.error ?? "That isn't a valid run.");
-    moves.playMeld(selected, decls);
+    moves.playMeld(selected, declarations);
     clearSelection();
   }
 
-  // Add the selected cards to whichever run on the table they legally extend.
   function doAddToTable() {
-    if (selectedCards.length < 1) return setError("Select cards to add first.");
-    if (!jokersDeclared()) return setError("Declare what each joker represents.");
-    const decls = buildDeclarations();
-    for (const meld of G.melds) {
-      if (validateExtend(meld, selectedCards, decls, me).ok) {
-        moves.extendMeld(meld.id, selected, decls);
-        clearSelection();
-        return;
-      }
-    }
-    setError("Those cards don't extend any run on the table.");
+    if (!extendableMeld) return setError("Those cards don't extend any run on the table.");
+    moves.extendMeld(extendableMeld.id, selected, declarations);
+    clearSelection();
   }
 
   function doDiscard() {
@@ -141,13 +168,11 @@ export function FiveHundredBoard({
     moves.discard(selected[0]);
     clearSelection();
   }
-
   function doClose() {
     if (myHand.length !== 1) return;
     moves.closeHand(myHand[0].id);
     clearSelection();
   }
-
   function doPass() {
     moves.passTurn();
     clearSelection();
@@ -160,61 +185,103 @@ export function FiveHundredBoard({
   }
 
   const faceUpTop = G.faceUp[G.faceUp.length - 1];
-  const canMeld = myTurn && G.hasDrawn && selectedCards.length >= 3;
-  const canAdd = myTurn && G.hasDrawn && selectedCards.length >= 1 && G.melds.length > 0;
-  const canDiscard = myTurn && G.hasDrawn && selected.length === 1 && myHand.length > 1;
-  const canClose = myTurn && G.hasDrawn && myHand.length === 1;
-  const canPass = myTurn && G.hasDrawn && myHand.length === 0;
+  const canMeld = myTurn && G.hasDrawn && !paused && selectedCards.length >= 3;
+  const canAdd = myTurn && G.hasDrawn && !paused && Boolean(extendableMeld);
+  const canDiscard = myTurn && G.hasDrawn && !paused && selected.length === 1 && myHand.length > 1;
+  const canClose = myTurn && G.hasDrawn && !paused && myHand.length === 1;
+  const canPass = myTurn && G.hasDrawn && !paused && myHand.length === 0;
+  const canDraw = myTurn && !G.hasDrawn && !paused;
 
   return (
     <div className="felt flex min-h-screen flex-col gap-4 px-4 pb-8 pt-14 text-white">
       {/* Status bar (pushed below the Leave button) */}
       <div className="flex items-center justify-between text-sm">
-        <span className="rounded-full bg-black/30 px-3 py-1 font-semibold">
-          {nameFor(me)} · {G.scores[me] ?? 0}p
-        </span>
+        <span className="rounded-full bg-black/30 px-3 py-1 font-semibold">Round {G.roundNumber}</span>
         <span
           className={`rounded-full px-3 py-1 font-semibold ${
-            myTurn ? "bg-amber-400 text-black" : "bg-black/30 text-white/80"
+            myTurn && !paused ? "bg-amber-400 text-black" : "bg-black/30 text-white/80"
           }`}
         >
           {gameover
             ? "Game over"
-            : myTurn
-              ? G.hasDrawn
-                ? "Your move"
-                : "Draw a card"
-              : `${nameFor(ctx.currentPlayer)}'s turn`}
+            : G.roundOver
+              ? "Round over"
+              : myTurn
+                ? G.hasDrawn
+                  ? "Your move"
+                  : "Draw a card"
+                : `${nameFor(ctx.currentPlayer)}'s turn`}
         </span>
         <span className={`text-xs ${isConnected ? "text-emerald-300" : "text-rose-300"}`}>
           {isConnected ? "● online" : "○ offline"}
         </span>
       </div>
 
-      {gameover && (
-        <div className="rounded-2xl border border-amber-300/40 bg-amber-400/15 p-4 text-center">
-          <p className="text-lg font-bold text-amber-200">
-            🏆 {gameover.winner !== undefined ? nameFor(gameover.winner) : "Someone"} closed the
-            hand and won!
+      {/* Round summary / game over */}
+      {paused && (
+        <div className="rounded-2xl border border-amber-300/40 bg-amber-400/10 p-4">
+          <p className="text-center text-lg font-bold text-amber-200">
+            {gameover
+              ? `🏆 ${gameover.winner !== undefined ? nameFor(gameover.winner) : "Someone"} wins!`
+              : `Round ${G.roundNumber} closed${
+                  G.closedBy ? ` by ${nameFor(G.closedBy)}` : ""
+                }`}
           </p>
+          <ul className="mx-auto mt-3 flex max-w-sm flex-col gap-1">
+            {ctx.playOrder.map((pid) => {
+              const delta = G.lastRound?.deltas[pid] ?? 0;
+              return (
+                <li key={pid} className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <AvatarChip a={avatars[pid]} size={24} />
+                    {nameFor(pid)}
+                  </span>
+                  <span className="tabular-nums">
+                    <span className={delta >= 0 ? "text-emerald-300" : "text-rose-300"}>
+                      {delta >= 0 ? "+" : ""}
+                      {delta}
+                    </span>
+                    <span className="ml-2 font-bold">{G.scores[pid] ?? 0}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+
           {G.closingCard && (
-            <div className="mt-3 flex flex-col items-center gap-2">
+            <div className="mt-3 flex flex-col items-center gap-1">
               <span className="text-xs text-white/60">Closing card</span>
               {peek ? (
-                <CardFace card={G.closingCard} large />
+                <CardFace card={G.closingCard} />
               ) : (
-                <button type="button" onClick={() => setPeek(true)}>
-                  <CardBack large label="👁" />
-                </button>
-              )}
-              {!peek && (
                 <button
                   type="button"
                   onClick={() => setPeek(true)}
-                  className="rounded-lg bg-white/15 px-3 py-1 text-xs font-semibold"
+                  className="flex flex-col items-center gap-1"
                 >
-                  Peek
+                  <CardBack label="👁" />
+                  <span className="rounded bg-white/15 px-2 py-0.5 text-[11px] font-semibold">
+                    Peek
+                  </span>
                 </button>
+              )}
+            </div>
+          )}
+
+          {!gameover && (
+            <div className="mt-4 text-center">
+              {myTurn ? (
+                <button
+                  type="button"
+                  onClick={() => moves.nextRound()}
+                  className="game-card rounded-xl px-5 py-3 text-sm font-bold text-white"
+                >
+                  Continue to next round
+                </button>
+              ) : (
+                <p className="text-sm text-white/60">
+                  Waiting for {G.closedBy ? nameFor(G.closedBy) : "the next round"}…
+                </p>
               )}
             </div>
           )}
@@ -227,11 +294,12 @@ export function FiveHundredBoard({
           <div
             key={pid}
             className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
-              ctx.currentPlayer === pid
+              ctx.currentPlayer === pid && !paused
                 ? "border-amber-300/60 bg-amber-400/10"
                 : "border-white/10 bg-white/5"
             }`}
           >
+            <AvatarChip a={avatars[pid]} size={32} />
             <div className="flex flex-col">
               <span className="text-sm font-semibold">{nameFor(pid)}</span>
               <span className="text-xs text-white/60">
@@ -253,7 +321,7 @@ export function FiveHundredBoard({
           <CardBack large label={String(G.stockCount ?? G.stock.length)} />
           <button
             type="button"
-            disabled={!myTurn || G.hasDrawn}
+            disabled={!canDraw}
             onClick={() => moves.drawFromStock()}
             className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold disabled:opacity-30"
           >
@@ -272,7 +340,7 @@ export function FiveHundredBoard({
           <div className="flex gap-1">
             <button
               type="button"
-              disabled={!myTurn || G.hasDrawn || G.faceUp.length === 0}
+              disabled={!canDraw || G.faceUp.length === 0}
               onClick={() => moves.drawFromFaceUp()}
               className="rounded-lg bg-white/15 px-2 py-1.5 text-xs font-semibold disabled:opacity-30"
             >
@@ -280,7 +348,7 @@ export function FiveHundredBoard({
             </button>
             <button
               type="button"
-              disabled={!myTurn || G.hasDrawn || G.faceUp.length === 0}
+              disabled={!canDraw || G.faceUp.length === 0}
               title="Take the whole pile (then meld or −50)"
               onClick={() => moves.takeFaceUpPile()}
               className="rounded-lg bg-white/15 px-2 py-1.5 text-xs font-semibold disabled:opacity-30"
@@ -291,7 +359,7 @@ export function FiveHundredBoard({
         </div>
       </div>
 
-      {G.mustMeld && myTurn && (
+      {G.mustMeld && myTurn && !paused && (
         <p className="rounded-lg bg-rose-500/20 px-3 py-2 text-center text-xs text-rose-100">
           You took the pile — play or extend a meld this turn, or lose 50 points.
         </p>
@@ -325,7 +393,7 @@ export function FiveHundredBoard({
                       <span className="text-[10px] text-white/40">
                         {nameFor(placed.placedBy).split(" ")[0]}
                       </span>
-                      {myTurn && canSwap(placed) && (
+                      {myTurn && !paused && canSwap(placed) && (
                         <button
                           type="button"
                           onClick={() => moves.swapJoker(meld.id, idx)}
@@ -344,7 +412,7 @@ export function FiveHundredBoard({
       </div>
 
       {/* Declarations for jokers / aces in the current selection */}
-      {(hasJoker || hasAce) && (
+      {!paused && (hasJoker || hasAce) && (
         <div className="rounded-xl border border-white/15 bg-black/20 p-3">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/50">
             Declare cards
@@ -379,14 +447,17 @@ export function FiveHundredBoard({
         </div>
       )}
 
-      {error && (
+      {error && !paused && (
         <p className="rounded-lg bg-rose-500/25 px-3 py-2 text-sm text-rose-100">{error}</p>
       )}
 
       {/* Your hand */}
       <div className="mt-auto">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Your hand</h3>
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <AvatarChip a={avatars[me]} size={24} />
+            You · {G.scores[me] ?? 0} pts
+          </h3>
           <span className="text-xs text-white/50">{myHand.length} cards</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -400,69 +471,71 @@ export function FiveHundredBoard({
               onClick={() => toggleSelect(card.id)}
             />
           ))}
-          {myHand.length === 0 && (
-            <span className="text-sm text-white/40">Empty hand.</span>
-          )}
+          {myHand.length === 0 && <span className="text-sm text-white/40">Empty hand.</span>}
         </div>
 
         {/* Action bar */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={!canMeld}
-            onClick={doMeld}
-            className="rounded-lg bg-emerald-500/80 px-4 py-2 text-sm font-semibold disabled:opacity-30"
-          >
-            Meld selected
-          </button>
-          <button
-            type="button"
-            disabled={!canAdd}
-            onClick={doAddToTable}
-            className="rounded-lg bg-emerald-500/60 px-4 py-2 text-sm font-semibold disabled:opacity-30"
-          >
-            Add to table
-          </button>
-          <button
-            type="button"
-            disabled={!canDiscard}
-            onClick={doDiscard}
-            className="rounded-lg bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-30"
-          >
-            Discard
-          </button>
-          {canPass ? (
-            <button
-              type="button"
-              onClick={doPass}
-              className="rounded-lg bg-amber-500/80 px-4 py-2 text-sm font-semibold text-black"
-            >
-              End turn
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={!canClose}
-              title="Place your last card face-down to close the hand and win"
-              onClick={doClose}
-              className="rounded-lg bg-amber-500/80 px-4 py-2 text-sm font-semibold text-black disabled:opacity-30"
-            >
-              Close hand
-            </button>
-          )}
-          {selected.length > 0 && (
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="rounded-lg px-3 py-2 text-sm text-white/60"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <p className="mt-2 text-xs text-white/40">
-          Selected value: {selectedCards.reduce((s, c) => s + cardValue(c), 0)} pts
-        </p>
+        {!paused && (
+          <>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!canMeld}
+                onClick={doMeld}
+                className="rounded-lg bg-emerald-500/80 px-4 py-2 text-sm font-semibold disabled:opacity-30"
+              >
+                Meld selected
+              </button>
+              <button
+                type="button"
+                disabled={!canAdd}
+                onClick={doAddToTable}
+                className="rounded-lg bg-emerald-500/60 px-4 py-2 text-sm font-semibold disabled:opacity-30"
+              >
+                Add to table
+              </button>
+              <button
+                type="button"
+                disabled={!canDiscard}
+                onClick={doDiscard}
+                className="rounded-lg bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-30"
+              >
+                Discard
+              </button>
+              {canPass ? (
+                <button
+                  type="button"
+                  onClick={doPass}
+                  className="rounded-lg bg-amber-500/80 px-4 py-2 text-sm font-semibold text-black"
+                >
+                  End turn
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!canClose}
+                  title="Place your last card face-down to close the round"
+                  onClick={doClose}
+                  className="rounded-lg bg-amber-500/80 px-4 py-2 text-sm font-semibold text-black disabled:opacity-30"
+                >
+                  Close round
+                </button>
+              )}
+              {selected.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="rounded-lg px-3 py-2 text-sm text-white/60"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-white/40">
+              Selected value: {selectedCards.reduce((s, c) => s + cardValue(c), 0)} pts
+            </p>
+          </>
+        )}
       </div>
 
       {/* Rules + log */}
@@ -470,30 +543,28 @@ export function FiveHundredBoard({
         <summary className="cursor-pointer select-none font-semibold">How to play</summary>
         <div className="mt-2 flex flex-col gap-2 leading-relaxed text-white/70">
           <p>
-            <strong className="text-white">Goal:</strong> be the first to empty your hand.
-            On your turn: <em>draw</em>, optionally <em>meld</em>, then end your turn.
+            <strong className="text-white">Goal:</strong> be the first to 500 points across
+            rounds. On your turn: <em>draw</em>, optionally <em>meld</em>, then end your turn.
           </p>
           <p>
-            <strong className="text-white">Draw</strong> one card from the deck, take the top
-            of the face-up pile, or take the <em>whole</em> pile — but if you take the whole
-            pile you must lay down a meld this turn or lose 50 points.
+            <strong className="text-white">Draw</strong> one card from the deck, take the top of
+            the face-up pile, or take the <em>whole</em> pile — but then you must lay down a meld
+            this turn or lose 50 points.
           </p>
           <p>
             <strong className="text-white">Melds</strong> are 3+ cards in sequence of the same
-            suit (e.g. ♥3-4-5). Lay new ones with “Meld selected”. “Add to table” appends your
-            selected cards to any run already on the table — points for added cards go to you.
-            You can’t wrap around (no K-A-2).
+            suit (e.g. ♥3-4-5). “Add to table” appends your selected cards to a run already on
+            the table (points go to you). You can’t wrap around (no K-A-2).
           </p>
           <p>
             <strong className="text-white">Jokers</strong> are wild — declare the card they
-            represent. If you hold that real card you may “swap” it in and take the joker.
-            <strong className="text-white"> Aces</strong> play low (below 2) or high (above K).
+            represent; hold the real card and you may “swap” it in.{" "}
+            <strong className="text-white">Aces</strong> play low (below 2) or high (above K).
           </p>
           <p>
-            <strong className="text-white">Winning:</strong> reduce your hand to one card, then
-            “Close hand” to place it face-down and win. If you play your very last card onto the
-            table instead, use “End turn” to pass. Card values: joker 25, ace 15, 10/J/Q/K 10,
-            2–9 = 5.
+            <strong className="text-white">Scoring (each round):</strong> +points for cards you
+            placed on the table, −points for cards left in your hand. Joker 25, ace 15, 10/J/Q/K
+            10, 2–9 = 5. Reduce to one card and “Close round” to end the round; first to 500 wins.
           </p>
         </div>
       </details>
@@ -511,6 +582,21 @@ export function FiveHundredBoard({
 
 // ---- Small presentational pieces ----------------------------------------
 
+function AvatarChip({ a, size = 32 }: { a?: AvatarInfo; size?: number }) {
+  if (!a) {
+    return (
+      <div
+        className="shrink-0 rounded-full bg-white/15"
+        style={{ width: size, height: size }}
+        aria-hidden
+      />
+    );
+  }
+  return (
+    <Avatar styleKey={a.styleKey} seed={a.seed} size={size} className="shrink-0 rounded-full" />
+  );
+}
+
 function CardFace({
   card,
   large,
@@ -526,7 +612,7 @@ function CardFace({
   highlight?: boolean;
   onClick?: () => void;
 }) {
-  const size = large ? "h-28 w-20 text-3xl" : "h-16 w-11 text-lg";
+  const size = large ? "h-28 w-20" : "h-16 w-11";
   const Tag = selectable ? "button" : "div";
   const ring = selected
     ? "-translate-y-2 ring-2 ring-amber-400"
@@ -538,13 +624,18 @@ function CardFace({
     return (
       <Tag
         {...(selectable ? { type: "button", onClick } : {})}
-        className={`flex ${size} shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-700 font-extrabold text-white shadow ${ring} ${
+        className={`flex ${size} shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-700 text-white shadow ${ring} ${
           selectable ? "transition hover:-translate-y-1" : ""
         }`}
       >
-        <span className={large ? "text-xl" : "text-base"}>JOKER</span>
-        <span className={large ? "text-3xl" : "text-xl"} aria-hidden>
-          🃏
+        <span className={`font-extrabold tracking-wide ${large ? "text-sm" : "text-[10px]"}`}>
+          JOKER
+        </span>
+        <span className={`leading-none ${large ? "text-xl" : "text-sm"}`} aria-hidden>
+          ♠♥♦♣
+        </span>
+        <span className={`uppercase tracking-widest opacity-80 ${large ? "text-[10px]" : "text-[7px]"}`}>
+          wild
         </span>
       </Tag>
     );
@@ -555,9 +646,9 @@ function CardFace({
   return (
     <Tag
       {...(selectable ? { type: "button", onClick } : {})}
-      className={`flex ${size} shrink-0 flex-col items-center justify-center rounded-lg bg-white font-bold shadow ${color} ${ring} ${
-        selectable ? "transition hover:-translate-y-1" : ""
-      }`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-lg bg-white font-bold shadow ${
+        large ? "text-3xl" : "text-lg"
+      } ${color} ${ring} ${selectable ? "transition hover:-translate-y-1" : ""}`}
     >
       {label}
     </Tag>
@@ -567,10 +658,10 @@ function CardFace({
 /** A joker sitting in a meld: shows the represented card with a wild badge. */
 function JokerOnTable({ label }: { label: string }) {
   return (
-    <div className="relative flex h-16 w-11 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-fuchsia-400 bg-white text-lg font-bold text-neutral-900 shadow">
+    <div className="relative flex h-16 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-fuchsia-400 bg-white text-lg font-bold text-neutral-900 shadow">
       {label}
-      <span className="absolute -right-1 -top-1 rounded-full bg-fuchsia-500 px-1 text-[9px] text-white">
-        🃏
+      <span className="absolute -right-1 -top-1 rounded-full bg-fuchsia-500 px-1 text-[9px] font-bold text-white">
+        J
       </span>
     </div>
   );
@@ -599,7 +690,7 @@ function JokerDeclare({
   const ranks = Array.from({ length: 14 }, (_, i) => i + 1); // 1..14 (14 = ace high)
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-fuchsia-300">🃏 represents</span>
+      <span className="text-fuchsia-300">Joker represents</span>
       <select
         value={rank || ""}
         onChange={(e) => onChange({ rank: Number(e.target.value), suit: suit ?? "spade" })}
@@ -620,9 +711,7 @@ function JokerDeclare({
             key={s}
             type="button"
             onClick={() => onChange({ rank: rank || 2, suit: s })}
-            className={`rounded px-2 py-1 ${
-              suit === s ? "bg-amber-400 text-black" : "bg-white/15"
-            }`}
+            className={`rounded px-2 py-1 ${suit === s ? "bg-amber-400 text-black" : "bg-white/15"}`}
           >
             {SUIT_SYMBOL[s]}
           </button>

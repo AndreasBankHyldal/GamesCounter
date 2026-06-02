@@ -50,11 +50,13 @@ export interface FiveHundredState {
   /** Cumulative scores across rounds. */
   scores: Record<PlayerID, number>;
   roundNumber: number;
-  /** Player who closed the hand (and won), else null. */
+  /** Player who closed the current round, else null. */
   closedBy: PlayerID | null;
   /** The face-down card placed on the pile when closing — revealable on peek. */
   closingCard: Card | null;
-  /** Set once a player closes the hand — drives `endIf`. */
+  /** True while a round is scored and waiting for "continue to next round". */
+  roundOver: boolean;
+  /** Set once someone reaches the winning score — drives `endIf` (game over). */
   finished: boolean;
   /** Result of the closing hand, for the UI. */
   lastRound: RoundResult | null;

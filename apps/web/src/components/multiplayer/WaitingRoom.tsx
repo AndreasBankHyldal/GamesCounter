@@ -16,12 +16,16 @@ import {
   saveIdentity,
   type Identity,
 } from "@/lib/multiplayer/identity";
+import { Avatar } from "@/components/Avatar";
+import { useRandomAvatar } from "@/lib/multiplayer/useRandomAvatar";
+import { AvatarField } from "./AvatarField";
 
 export function WaitingRoom({ code }: { code: string }) {
   const router = useRouter();
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [name, setName] = useState("");
+  const [avatar, setAvatar] = useRandomAvatar();
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -64,8 +68,14 @@ export function WaitingRoom({ code }: { code: string }) {
     const player = name.trim();
     if (!player) return setError("Enter your name.");
     try {
-      const { playerID, playerCredentials } = await joinRoom(code, player);
-      const id = { playerID, credentials: playerCredentials, name: player };
+      const { playerID, playerCredentials } = await joinRoom(code, player, avatar);
+      const id: Identity = {
+        playerID,
+        credentials: playerCredentials,
+        name: player,
+        avatarStyle: avatar.styleKey,
+        avatarSeed: avatar.seed,
+      };
       saveIdentity(code, id);
       setIdentity(id);
       setError(null);
@@ -78,7 +88,11 @@ export function WaitingRoom({ code }: { code: string }) {
     if (!identity) return;
     setStarting(true);
     try {
-      await startRoom(code, identity.playerID, identity.credentials);
+      const ownAvatar =
+        identity.avatarStyle && identity.avatarSeed
+          ? { styleKey: identity.avatarStyle, seed: identity.avatarSeed }
+          : undefined;
+      await startRoom(code, identity.playerID, identity.credentials, ownAvatar);
       router.replace(`/play/${code}/table`);
     } catch {
       setError("Couldn't start the game.");
@@ -110,13 +124,16 @@ export function WaitingRoom({ code }: { code: string }) {
             {code}
           </p>
           <form onSubmit={joinHere} className="flex flex-col gap-3">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              maxLength={20}
-              className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-white placeholder:text-white/30"
-            />
+            <div className="flex items-center gap-3">
+              <AvatarField value={avatar} onChange={setAvatar} size={56} />
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                maxLength={20}
+                className="flex-1 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-white placeholder:text-white/30"
+              />
+            </div>
             {error && <p className="text-sm text-rose-300">{error}</p>}
             <button
               type="submit"
@@ -165,7 +182,17 @@ export function WaitingRoom({ code }: { code: string }) {
               key={p.id}
               className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
             >
-              <span className="font-semibold text-white">
+              <span className="flex items-center gap-3 font-semibold text-white">
+                {p.data?.avatarStyle && p.data?.avatarSeed ? (
+                  <Avatar
+                    styleKey={p.data.avatarStyle}
+                    seed={p.data.avatarSeed}
+                    size={32}
+                    className="rounded-full"
+                  />
+                ) : (
+                  <span className="h-8 w-8 shrink-0 rounded-full bg-white/15" aria-hidden />
+                )}
                 {p.name ?? <span className="text-white/40">Empty seat</span>}
               </span>
               <span className="text-xs text-white/50">

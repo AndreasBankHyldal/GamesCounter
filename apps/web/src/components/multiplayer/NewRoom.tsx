@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { GAMES } from "@gamescounter/games";
 import { createRoom, joinRoom } from "@/lib/multiplayer/lobby";
 import { saveIdentity } from "@/lib/multiplayer/identity";
+import { useRandomAvatar } from "@/lib/multiplayer/useRandomAvatar";
+import { AvatarField } from "./AvatarField";
 
 export function NewRoom() {
   const router = useRouter();
@@ -13,6 +15,7 @@ export function NewRoom() {
   const game = GAMES[0];
   const [name, setName] = useState("");
   const [count, setCount] = useState(2);
+  const [avatar, setAvatar] = useRandomAvatar();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,8 +26,14 @@ export function NewRoom() {
     setError(null);
     try {
       const code = await createRoom(count);
-      const { playerID, playerCredentials } = await joinRoom(code, player);
-      saveIdentity(code, { playerID, credentials: playerCredentials, name: player });
+      const { playerID, playerCredentials } = await joinRoom(code, player, avatar);
+      saveIdentity(code, {
+        playerID,
+        credentials: playerCredentials,
+        name: player,
+        avatarStyle: avatar.styleKey,
+        avatarSeed: avatar.seed,
+      });
       router.replace(`/play/${code}`);
     } catch {
       setError("Couldn't create the room. Is the game server running?");
@@ -53,16 +62,19 @@ export function NewRoom() {
           <p className="text-sm text-white/60">{game.tagline}</p>
         </div>
 
-        <label className="flex flex-col gap-2">
-          <span className="text-sm font-semibold text-white">Your name</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Andreas"
-            maxLength={20}
-            className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-white placeholder:text-white/30"
-          />
-        </label>
+        <div className="flex items-end gap-3">
+          <AvatarField value={avatar} onChange={setAvatar} />
+          <label className="flex flex-1 flex-col gap-2">
+            <span className="text-sm font-semibold text-white">Your name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Andreas"
+              maxLength={20}
+              className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-white placeholder:text-white/30"
+            />
+          </label>
+        </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <p className="text-sm font-semibold text-white">Players</p>

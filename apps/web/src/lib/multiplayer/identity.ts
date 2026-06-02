@@ -5,6 +5,8 @@ export interface Identity {
   playerID: string;
   credentials: string;
   name: string;
+  avatarStyle?: string;
+  avatarSeed?: string;
 }
 
 const key = (code: string) => `gc:mp:${code.toUpperCase()}`;
