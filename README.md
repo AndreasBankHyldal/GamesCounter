@@ -83,10 +83,28 @@ Blueprint) or create a **Web Service** manually with:
   resolve `@gamescounter/games`; do **not** set it to `apps/server`).
 - **Build Command**: `npm install --legacy-peer-deps`
 - **Start Command**: `npm run start:server`
-- **Env var**: `CLIENT_ORIGIN` = your Vercel URL (Render injects `PORT` itself).
+- **Env vars**:
+  - `CLIENT_ORIGIN` = your Vercel URL (Render injects `PORT` and
+    `RENDER_EXTERNAL_URL` itself).
+  - `DATABASE_URL` = a Postgres connection string (see below).
 
 The server runs TypeScript directly via `tsx` (a runtime dependency — no build
 step). Copy the resulting URL, e.g. `https://gamescounter-server.onrender.com`.
+
+#### Persistence (recommended)
+
+Without `DATABASE_URL` the server uses **in-memory** storage, so matches vanish
+on every restart/spin-down. To keep games alive:
+
+1. Render → **New → Postgres** (free plan), same region as the service.
+2. On the web service, add env var `DATABASE_URL` → link it to that database's
+   **Internal Connection String** (or use the blueprint, which wires this up).
+3. Redeploy. Logs should show `Storage: Postgres (persistent)`. The
+   `bgio_matches` table is created automatically on first boot.
+
+The server also **self-pings** `RENDER_EXTERNAL_URL` every 10 min to keep the
+free instance from spinning down mid-session (automatic on Render; no-op
+locally).
 
 ### Web → Vercel
 
@@ -95,7 +113,8 @@ step). Copy the resulting URL, e.g. `https://gamescounter-server.onrender.com`.
 
 ### Free-tier caveats
 
-- Render free services **spin down after ~15 min idle** and cold-start (~30–60s)
-  on the next request — this drops active matches/websockets.
-- Storage is **in-memory**, so matches are also lost on any restart. Swap in a
-  persistent boardgame.io storage adapter (e.g. Postgres/Flatfile) for real use.
+- A keep-alive ping keeps the instance awake, but a free service still uses
+  ~720 of the 750 monthly instance-hours when always-on — fine for a single
+  service. Redeploys still cause a brief restart.
+- Render's **free Postgres** has storage/age limits; upgrade if you need it
+  long-term.
