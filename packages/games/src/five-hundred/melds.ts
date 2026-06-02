@@ -1,6 +1,10 @@
 import type { Card, Suit } from "../cards";
 import type { Declaration, Meld, PlacedCard, PlayerID } from "./types";
 
+// House rule: the Ace is unbounded and bridges King and 2, so runs may wrap
+// through it (…Q-K-A-2-3…). Ranks are therefore treated on a 13-position circle
+// (A=1 … K=13, then back to A). A run is any contiguous arc of 3–13 of them.
+
 export interface ResolveResult {
   ok: boolean;
   error?: string;
@@ -10,7 +14,7 @@ export interface ResolveResult {
 
 interface ResolvedCard {
   card: Card;
-  asRank: number;
+  asRank: number; // 1..13 (A=1, J=11, Q=12, K=13)
   asSuit: Suit;
 }
 
@@ -21,13 +25,12 @@ function declarationFor(
   return declarations.find((d) => d.cardId === cardId);
 }
 
-/** Resolve raw cards + declarations into sequence ranks/suits for one suit. */
+/** Resolve raw cards + declarations into ranks/suit for one suit. */
 function resolveCards(
   cards: Card[],
   declarations: Declaration[],
   forcedSuit?: Suit
 ): ResolveResult {
-  // Determine the meld suit from the real (non-joker) cards.
   const realSuits = new Set(
     cards.filter((c) => !c.isJoker).map((c) => c.suit as Suit)
   );
@@ -42,8 +45,8 @@ function resolveCards(
 
   const resolved: ResolvedCard[] = [];
   for (const card of cards) {
-    const decl = declarationFor(card.id, declarations);
     if (card.isJoker) {
+      const decl = declarationFor(card.id, declarations);
       if (!decl || typeof decl.asRank !== "number") {
         return { ok: false, error: "Each joker must declare the card it represents." };
       }
@@ -53,31 +56,47 @@ function resolveCards(
     if (card.suit !== suit) {
       return { ok: false, error: "All cards in a run must be the same suit." };
     }
-    // Aces may be declared high (14) or low (1); default to low.
-    if (card.rank === 1) {
-      const asRank = decl?.asRank === 14 ? 14 : 1;
-      resolved.push({ card, asRank, asSuit: suit });
-    } else {
-      resolved.push({ card, asRank: card.rank, asSuit: suit });
-    }
+    resolved.push({ card, asRank: card.rank, asSuit: suit });
   }
   return { ok: true, suit, resolved };
 }
 
-/** True when ranks form a gap-free, duplicate-free ascending run. */
-function isConsecutiveDistinct(ranks: number[]): boolean {
-  const sorted = [...ranks].sort((a, b) => a - b);
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i] === sorted[i - 1]) return false; // duplicate rank
-    if (sorted[i] !== sorted[i - 1] + 1) return false; // gap
+/**
+ * If the distinct ranks form a contiguous arc on the 13-rank circle, return the
+ * arc's starting rank; otherwise null. Length must be 3–13.
+ */
+function circularStart(ranks: number[]): number | null {
+  const n = ranks.length;
+  if (n < 3 || n > 13) return null;
+  const set = new Set(ranks);
+  if (set.size !== n) return null; // no duplicate ranks
+  for (let start = 1; start <= 13; start++) {
+    let ok = true;
+    for (let k = 0; k < n; k++) {
+      const r = ((start - 1 + k) % 13) + 1;
+      if (!set.has(r)) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return start;
   }
-  return true;
+  return null;
+}
+
+/** Order placed cards along the arc starting at `start` (so K-A-2 reads in order). */
+function orderByArc(placed: PlacedCard[], start: number): PlacedCard[] {
+  const pos = (r: number) => (r - start + 13) % 13;
+  return [...placed].sort((a, b) => pos(a.asRank) - pos(b.asRank));
 }
 
 function toPlaced(resolved: ResolvedCard[], placedBy: PlayerID): PlacedCard[] {
-  return resolved
-    .map((r) => ({ card: r.card, placedBy, asRank: r.asRank, asSuit: r.asSuit }))
-    .sort((a, b) => a.asRank - b.asRank);
+  return resolved.map((r) => ({
+    card: r.card,
+    placedBy,
+    asRank: r.asRank,
+    asSuit: r.asSuit,
+  }));
 }
 
 export interface MeldResult {
@@ -101,22 +120,20 @@ export function validateNewMeld(
     return { ok: false, error: res.error };
   }
   const ranks = res.resolved.map((r) => r.asRank);
-  if (ranks.some((r) => r < 1 || r > 14)) {
-    return { ok: false, error: "Card ranks out of range." };
-  }
-  if (!isConsecutiveDistinct(ranks)) {
-    return { ok: false, error: "Cards must form a gap-free run with no duplicates." };
+  const start = circularStart(ranks);
+  if (start === null) {
+    return { ok: false, error: "Cards must form a run with no gaps or duplicates." };
   }
   return {
     ok: true,
-    meld: { id: meldId, suit: res.suit, cards: toPlaced(res.resolved, placedBy) },
+    meld: { id: meldId, suit: res.suit, cards: orderByArc(toPlaced(res.resolved, placedBy), start) },
   };
 }
 
 /**
- * Validate extending an existing meld at either end. Returns the new sorted
- * card list to replace `meld.cards`. The added cards are scored by `placedBy`
- * (which may differ from the original meld owner — points go to the placer).
+ * Validate extending an existing meld. Returns the new ordered card list to
+ * replace `meld.cards`. Added cards are scored by `placedBy` (which may differ
+ * from the original owner — points go to whoever places them).
  */
 export function validateExtend(
   meld: Meld,
@@ -132,22 +149,18 @@ export function validateExtend(
     return { ok: false, error: res.error };
   }
   const added = toPlaced(res.resolved, placedBy);
-  const combined = [...meld.cards, ...added].sort((a, b) => a.asRank - b.asRank);
-  const ranks = combined.map((c) => c.asRank);
-  if (ranks.some((r) => r < 1 || r > 14)) {
-    return { ok: false, error: "Card ranks out of range." };
-  }
-  if (!isConsecutiveDistinct(ranks)) {
+  const combined = [...meld.cards, ...added];
+  const start = circularStart(combined.map((c) => c.asRank));
+  if (start === null) {
     return { ok: false, error: "Added cards must extend the run with no gaps or duplicates." };
   }
-  return { ok: true, cards: combined };
+  return { ok: true, cards: orderByArc(combined, start) };
 }
 
 /**
  * The real card a placed joker represents, so an opponent holding it may swap.
- * Returns the suit + rank (1–13) of the concrete card; ace-high (14) maps to 1.
+ * Returns the suit + rank (1–13) of the concrete card.
  */
 export function jokerRepresents(placed: PlacedCard): { suit: Suit; rank: number } {
-  const rank = placed.asRank === 14 ? 1 : placed.asRank;
-  return { suit: placed.asSuit, rank };
+  return { suit: placed.asSuit, rank: placed.asRank };
 }

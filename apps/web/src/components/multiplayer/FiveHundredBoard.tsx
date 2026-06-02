@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { BoardProps } from "boardgame.io/react";
 import {
   cardValue,
-  formatCard,
   jokerRepresents,
   RANK_LABEL,
   SUIT_COLOR,
@@ -41,8 +40,7 @@ function isRed(card: Card): boolean {
 }
 
 function placedJokerLabel(placed: PlacedCard): string {
-  const rank = placed.asRank === 14 ? 1 : placed.asRank;
-  return `${RANK_LABEL[rank] ?? rank}${SUIT_SYMBOL[placed.asSuit]}`;
+  return `${RANK_LABEL[placed.asRank] ?? placed.asRank}${SUIT_SYMBOL[placed.asSuit]}`;
 }
 
 export function FiveHundredBoard({
@@ -58,7 +56,6 @@ export function FiveHundredBoard({
   const me = playerID ?? "0";
   const [selected, setSelected] = useState<string[]>([]);
   const [jokerDecl, setJokerDecl] = useState<Record<string, { rank: number; suit: Suit }>>({});
-  const [aceHigh, setAceHigh] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [peek, setPeek] = useState(false);
   const [avatars, setAvatars] = useState<Record<string, AvatarInfo>>({});
@@ -106,7 +103,6 @@ export function FiveHundredBoard({
     .map((id) => myHand.find((c) => c.id === id))
     .filter((c): c is Card => Boolean(c));
   const hasJoker = selectedCards.some((c) => c.isJoker);
-  const hasAce = selectedCards.some((c) => !c.isJoker && c.rank === 1);
   const myTurn = isActive;
   const gameover = ctx.gameover as { winner?: string; scores?: Record<string, number> } | undefined;
   const paused = G.roundOver || Boolean(gameover);
@@ -120,7 +116,6 @@ export function FiveHundredBoard({
   function clearSelection() {
     setSelected([]);
     setJokerDecl({});
-    setAceHigh({});
   }
 
   function buildDeclarations(): Declaration[] {
@@ -129,8 +124,6 @@ export function FiveHundredBoard({
       if (card.isJoker) {
         const d = jokerDecl[card.id];
         if (d) decls.push({ cardId: card.id, asRank: d.rank, asSuit: d.suit });
-      } else if (card.rank === 1 && aceHigh[card.id]) {
-        decls.push({ cardId: card.id, asRank: 14 });
       }
     }
     return decls;
@@ -411,11 +404,11 @@ export function FiveHundredBoard({
         )}
       </div>
 
-      {/* Declarations for jokers / aces in the current selection */}
-      {!paused && (hasJoker || hasAce) && (
+      {/* Declarations for jokers in the current selection */}
+      {!paused && hasJoker && (
         <div className="rounded-xl border border-white/15 bg-black/20 p-3">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/50">
-            Declare cards
+            Declare jokers
           </h3>
           <div className="flex flex-col gap-2">
             {selectedCards
@@ -426,22 +419,6 @@ export function FiveHundredBoard({
                   value={jokerDecl[c.id]}
                   onChange={(v) => setJokerDecl((p) => ({ ...p, [c.id]: v }))}
                 />
-              ))}
-            {selectedCards
-              .filter((c) => !c.isJoker && c.rank === 1)
-              .map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-sm">
-                  <span className={isRed(c) ? "suit-red" : "text-white"}>
-                    {formatCard(c)} plays as
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAceHigh((p) => ({ ...p, [c.id]: !p[c.id] }))}
-                    className="rounded bg-white/15 px-2 py-1 text-xs font-semibold"
-                  >
-                    {aceHigh[c.id] ? "high (above K)" : "low (below 2)"}
-                  </button>
-                </label>
               ))}
           </div>
         </div>
@@ -554,12 +531,12 @@ export function FiveHundredBoard({
           <p>
             <strong className="text-white">Melds</strong> are 3+ cards in sequence of the same
             suit (e.g. ♥3-4-5). “Add to table” appends your selected cards to a run already on
-            the table (points go to you). You can’t wrap around (no K-A-2).
+            the table (points go to you). The <strong className="text-white">Ace</strong> is
+            unbounded — it bridges King and 2, so K-A-2 (and Q-K-A-2…) are valid runs.
           </p>
           <p>
             <strong className="text-white">Jokers</strong> are wild — declare the card they
-            represent; hold the real card and you may “swap” it in.{" "}
-            <strong className="text-white">Aces</strong> play low (below 2) or high (above K).
+            represent; hold the real card and you may “swap” it in.
           </p>
           <p>
             <strong className="text-white">Scoring (each round):</strong> +points for cards you
@@ -687,7 +664,7 @@ function JokerDeclare({
 }) {
   const rank = value?.rank ?? 0;
   const suit = value?.suit;
-  const ranks = Array.from({ length: 14 }, (_, i) => i + 1); // 1..14 (14 = ace high)
+  const ranks = Array.from({ length: 13 }, (_, i) => i + 1); // 1..13 (A=1 … K=13)
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-fuchsia-300">Joker represents</span>
@@ -701,7 +678,7 @@ function JokerDeclare({
         </option>
         {ranks.map((r) => (
           <option key={r} value={r} className="text-black">
-            {r === 14 ? "A (high)" : (RANK_LABEL[r] ?? r)}
+            {RANK_LABEL[r] ?? r}
           </option>
         ))}
       </select>
