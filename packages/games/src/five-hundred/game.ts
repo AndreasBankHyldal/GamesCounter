@@ -29,8 +29,9 @@ function dealRound(playerIDs: PlayerID[], shuffle: Shuffle) {
   return { hands, stock, faceUp };
 }
 
+/** Player reference token; the client swaps `@@<id>@@` for the display name. */
 function tag(playerID: PlayerID) {
-  return `P${Number(playerID) + 1}`;
+  return `@@${playerID}@@`;
 }
 
 export const FiveHundred: Game<FiveHundredState> = {
@@ -52,12 +53,14 @@ export const FiveHundred: Game<FiveHundredState> = {
       scores,
       roundNumber: 1,
       closedBy: null,
+      closingCard: null,
       finished: false,
       lastRound: null,
+      lastDrawnId: null,
       // "Youngest player goes first" — we have no birthdates, so seat 0 (the
       // host / first to join) leads. boardgame.io's default turn order starts
       // at playOrder[0] and proceeds in join order.
-      log: ["Round 1 dealt."],
+      log: ["The cards are dealt."],
       hasDrawn: false,
       tookPile: false,
       mustMeld: false,
@@ -71,6 +74,7 @@ export const FiveHundred: Game<FiveHundredState> = {
       G.tookPile = false;
       G.mustMeld = false;
       G.meldedThisTurn = false;
+      G.lastDrawnId = null;
     },
   },
 
@@ -89,6 +93,7 @@ export const FiveHundred: Game<FiveHundredState> = {
       const card = G.stock.pop()!;
       G.hands[playerID].push(card);
       G.hasDrawn = true;
+      G.lastDrawnId = card.id;
       G.log.push(`${tag(playerID)} drew from the deck.`);
     },
 
@@ -98,19 +103,19 @@ export const FiveHundred: Game<FiveHundredState> = {
       const card = G.faceUp.pop()!;
       G.hands[playerID].push(card);
       G.hasDrawn = true;
+      G.lastDrawnId = card.id;
       G.log.push(`${tag(playerID)} took ${formatCard(card)} from the pile.`);
     },
 
     takeFaceUpPile: ({ G, playerID }) => {
       if (G.hasDrawn) return INVALID_MOVE;
-      // First-round restriction: cannot take the whole face-up pile.
-      if (G.roundNumber === 1) return INVALID_MOVE;
       if (G.faceUp.length === 0) return INVALID_MOVE;
       G.hands[playerID].push(...G.faceUp);
       G.faceUp = [];
       G.hasDrawn = true;
       G.tookPile = true;
       G.mustMeld = true; // owes a meld this turn, or −50 at discard
+      G.lastDrawnId = null;
       G.log.push(`${tag(playerID)} took the entire pile.`);
     },
 
@@ -162,7 +167,7 @@ export const FiveHundred: Game<FiveHundredState> = {
       G.hands[playerID] = hand.filter((c) => !cardIds.includes(c.id));
       G.mustMeld = false;
       G.meldedThisTurn = true;
-      G.log.push(`${tag(playerID)} extended a ${meld.suit} run.`);
+      G.log.push(`${tag(playerID)} added to a ${meld.suit} run.`);
     },
 
     // ---- Joker swap (on your turn, if you hold the represented real card) ----
@@ -185,21 +190,17 @@ export const FiveHundred: Game<FiveHundredState> = {
         asSuit: placed.asSuit,
       };
       G.hands[playerID] = hand.filter((c) => c.id !== real.id).concat(joker);
-      G.log.push(`${tag(playerID)} swapped a real card for a joker.`);
+      G.log.push(`${tag(playerID)} swapped a real card in for a joker.`);
     },
 
-    // ---- Discard phase (ends the turn) ----
-    discard: ({ G, ctx, playerID, events, random }, cardId: string, faceDown = false) => {
+    // ---- End of turn ----
+    // Normal face-up discard: pile stays open, next player's turn.
+    discard: ({ G, playerID, events }, cardId: string) => {
       if (!G.hasDrawn) return INVALID_MOVE;
       const hand = G.hands[playerID];
       const card = hand.find((c) => c.id === cardId);
       if (!card) return INVALID_MOVE;
-      // Closing means discarding your LAST card face-down.
-      if (faceDown && hand.length !== 1) return INVALID_MOVE;
-      // First-round restriction: cannot close the game.
-      if (faceDown && G.roundNumber === 1) return INVALID_MOVE;
 
-      // Penalty for taking the pile without ever melding.
       if (G.mustMeld && !G.meldedThisTurn) {
         G.scores[playerID] -= PILE_PENALTY;
         G.mustMeld = false;
@@ -207,48 +208,47 @@ export const FiveHundred: Game<FiveHundredState> = {
       }
 
       G.hands[playerID] = hand.filter((c) => c.id !== cardId);
-
-      if (faceDown) {
-        G.closedBy = playerID;
-        const result = scoreRound(G, ctx.playOrder, playerID);
-        for (const id of ctx.playOrder) G.scores[id] += result.deltas[id] ?? 0;
-        G.lastRound = result;
-        G.log.push(`${tag(playerID)} closed round ${G.roundNumber}.`);
-
-        const winner = ctx.playOrder.find((id) => G.scores[id] >= WIN_SCORE);
-        if (winner !== undefined) {
-          G.finished = true;
-          G.log.push(`${tag(winner)} reached ${WIN_SCORE} — game over.`);
-          return; // endIf ends the game
-        }
-
-        // No winner yet: deal the next round and pass to the next player.
-        G.roundNumber += 1;
-        const next = dealRound(ctx.playOrder, (a) => random.Shuffle(a));
-        G.hands = next.hands;
-        G.stock = next.stock;
-        G.faceUp = next.faceUp;
-        G.melds = [];
-        G.closedBy = null;
-        G.log.push(`Round ${G.roundNumber} dealt.`);
-        events.endTurn();
-        return;
-      }
-
-      // Normal face-up discard: pile stays open, next player's turn.
       G.faceUp.push(card);
       G.log.push(`${tag(playerID)} discarded ${formatCard(card)}.`);
       events.endTurn();
     },
+
+    // Played the whole hand onto the table — go out and pass to the next player.
+    passTurn: ({ G, playerID, events }) => {
+      if (!G.hasDrawn) return INVALID_MOVE;
+      if (G.hands[playerID].length !== 0) return INVALID_MOVE;
+      G.log.push(`${tag(playerID)} played their last card and passed.`);
+      events.endTurn();
+    },
+
+    // Close the hand: place your final card face-down on the pile and win.
+    closeHand: ({ G, ctx, playerID }, cardId: string) => {
+      if (!G.hasDrawn) return INVALID_MOVE;
+      const hand = G.hands[playerID];
+      if (hand.length !== 1) return INVALID_MOVE;
+      const card = hand.find((c) => c.id === cardId);
+      if (!card) return INVALID_MOVE;
+
+      if (G.mustMeld && !G.meldedThisTurn) {
+        G.scores[playerID] -= PILE_PENALTY;
+        G.mustMeld = false;
+      }
+
+      G.hands[playerID] = [];
+      G.closingCard = card; // sits face-down on the pile; others may peek
+      G.closedBy = playerID;
+      G.finished = true;
+      const result = scoreRound(G, ctx.playOrder, playerID);
+      for (const id of ctx.playOrder) G.scores[id] += result.deltas[id] ?? 0;
+      G.lastRound = result;
+      G.log.push(`${tag(playerID)} closed the hand and won!`);
+      // endIf ends the game.
+    },
   },
 
-  endIf: ({ G, ctx }) => {
-    if (!G.finished) return;
-    let winner = ctx.playOrder[0];
-    for (const id of ctx.playOrder) {
-      if (G.scores[id] > G.scores[winner]) winner = id;
-    }
-    return { winner, scores: G.scores };
+  endIf: ({ G }) => {
+    if (!G.finished || G.closedBy === null) return;
+    return { winner: G.closedBy, scores: G.scores };
   },
 
   // Hide secret state from each client: other players' hands and the face-down

@@ -31,10 +31,10 @@ export function TableMount({ code }: { code: string }) {
   }
 
   return (
-    <div className="relative min-h-full">
+    <div className="felt relative min-h-screen">
       <Link
-        href={`/play/${code}`}
-        className="absolute right-3 top-3 z-10 rounded-full bg-black/40 px-3 py-1 text-xs text-white/80"
+        href="/"
+        className="absolute right-3 top-3 z-20 rounded-full bg-black/40 px-3 py-1 text-xs text-white/80"
       >
         Leave
       </Link>

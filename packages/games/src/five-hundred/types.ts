@@ -50,13 +50,18 @@ export interface FiveHundredState {
   /** Cumulative scores across rounds. */
   scores: Record<PlayerID, number>;
   roundNumber: number;
-  /** Player who closed the current round (face-down discard), else null. */
+  /** Player who closed the hand (and won), else null. */
   closedBy: PlayerID | null;
-  /** Set once someone reaches 500 — drives `endIf`. */
+  /** The face-down card placed on the pile when closing — revealable on peek. */
+  closingCard: Card | null;
+  /** Set once a player closes the hand — drives `endIf`. */
   finished: boolean;
-  /** Result of the most recently scored round, for the UI. */
+  /** Result of the closing hand, for the UI. */
   lastRound: RoundResult | null;
-  /** Short human-readable event log (most recent last). */
+  /** Id of the card the current player just drew (for the hand highlight). */
+  lastDrawnId: string | null;
+  /** Short human-readable event log (most recent last). Player references use
+   * `@@<id>@@` tokens so the client can substitute display names. */
   log: string[];
 
   // ---- Per-turn flags (reset in turn.onBegin) ----
