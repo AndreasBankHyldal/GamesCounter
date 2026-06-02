@@ -506,13 +506,16 @@ export function FiveHundredBoard({
                     {suitMelds.map((meld) => (
                       <div key={meld.id} className="flex items-start gap-1">
                         {meld.cards.map((placed, idx) => (
-                          <div key={idx} className="flex flex-col items-center">
+                          <div key={idx} className="flex w-11 flex-col items-center">
                             {placed.card.isJoker ? (
                               <JokerOnTable placed={placed} />
                             ) : (
                               <CardFace card={placed.card} />
                             )}
-                            <span className="text-[10px] text-white/40">
+                            <span
+                              className="w-full truncate text-center text-[10px] text-white/40"
+                              title={nameFor(placed.placedBy)}
+                            >
                               {nameFor(placed.placedBy).split(" ")[0]}
                             </span>
                             {myTurn && !paused && canSwap(placed) && (
