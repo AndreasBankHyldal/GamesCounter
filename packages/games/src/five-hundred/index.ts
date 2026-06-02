@@ -1,4 +1,4 @@
-export { FiveHundred, WIN_SCORE } from "./game";
+export { FiveHundred, WIN_SCORE, meldingOpen } from "./game";
 export * from "./types";
 export {
   validateNewMeld,

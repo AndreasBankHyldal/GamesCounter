@@ -33,10 +33,14 @@ function avatarData(avatar?: AvatarChoice): PlayerData {
 }
 
 /** Create a private match and return its 6-char room code. */
-export async function createRoom(numPlayers: number): Promise<string> {
+export async function createRoom(
+  numPlayers: number,
+  options?: { jokers?: number }
+): Promise<string> {
   const { matchID } = await lobby.createMatch(GAME_NAME, {
     numPlayers,
     unlisted: true,
+    setupData: { jokers: options?.jokers ?? 2 },
   });
   return matchID;
 }

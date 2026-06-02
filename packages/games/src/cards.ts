@@ -57,15 +57,20 @@ export function formatCard(card: Card): string {
   return `${rank}${SUIT_SYMBOL[card.suit as Suit]}`;
 }
 
-/** A fresh, ordered 54-card deck: standard 52 + 2 jokers. Caller shuffles. */
-export function buildDeck(): Card[] {
+/**
+ * A fresh, ordered deck: standard 52 cards + `jokerCount` jokers (default 2,
+ * clamped to 0–4). Caller shuffles.
+ */
+export function buildDeck(jokerCount = 2): Card[] {
   const deck: Card[] = [];
   for (const suit of SUITS) {
     for (let rank = 1; rank <= 13; rank++) {
       deck.push({ id: `${suit}-${rank}`, suit, rank, isJoker: false });
     }
   }
-  deck.push({ id: "joker-1", suit: null, rank: 0, isJoker: true });
-  deck.push({ id: "joker-2", suit: null, rank: 0, isJoker: true });
+  const jokers = Math.max(0, Math.min(4, Math.floor(jokerCount)));
+  for (let i = 1; i <= jokers; i++) {
+    deck.push({ id: `joker-${i}`, suit: null, rank: 0, isJoker: true });
+  }
   return deck;
 }

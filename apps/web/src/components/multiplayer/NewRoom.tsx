@@ -15,6 +15,7 @@ export function NewRoom() {
   const game = GAMES[0];
   const [name, setName] = useState("");
   const [count, setCount] = useState(2);
+  const [jokers, setJokers] = useState(2);
   const [avatar, setAvatar] = useRandomAvatar();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export function NewRoom() {
     setBusy(true);
     setError(null);
     try {
-      const code = await createRoom(count);
+      const code = await createRoom(count, { jokers });
       const { playerID, playerCredentials } = await joinRoom(code, player, avatar);
       saveIdentity(code, {
         playerID,
@@ -103,6 +104,30 @@ export function NewRoom() {
             >
               +
             </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="text-sm font-semibold text-white">Jokers</p>
+          <p className="text-xs text-white/50">
+            How many wild jokers to shuffle into the deck.
+          </p>
+          <div className="mt-3 flex items-center justify-center gap-2">
+            {[0, 1, 2, 3, 4].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setJokers(n)}
+                aria-pressed={jokers === n}
+                className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl font-bold tabular-nums transition ${
+                  jokers === n
+                    ? "bg-amber-400 text-black"
+                    : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
           </div>
         </div>
 
