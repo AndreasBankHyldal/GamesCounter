@@ -1,0 +1,19 @@
+"use client";
+
+import { Client } from "boardgame.io/react";
+import { SocketIO } from "boardgame.io/multiplayer";
+import { FiveHundred } from "@gamescounter/games";
+import { FiveHundredBoard } from "@/components/multiplayer/FiveHundredBoard";
+import { SERVER_URL } from "./config";
+
+/**
+ * boardgame.io React client for 500, wired to the server over SocketIO.
+ * Render with match props, e.g.
+ *   <FiveHundredClient matchID={code} playerID="0" credentials={creds} />
+ */
+export const FiveHundredClient = Client({
+  game: FiveHundred,
+  board: FiveHundredBoard,
+  multiplayer: SocketIO({ server: SERVER_URL }),
+  debug: false,
+});

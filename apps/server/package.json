@@ -1,0 +1,21 @@
+{
+  "name": "@gamescounter/server",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gamescounter/games": "*",
+    "boardgame.io": "^0.50.2",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/koa": "^2.15.0",
+    "@types/node": "^20",
+    "typescript": "^5"
+  }
+}

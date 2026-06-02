@@ -1,0 +1,17 @@
+# Render Blueprint for the boardgame.io game server (apps/server).
+# In Render: New > Blueprint, point it at this repo, and it reads this file.
+# The web app (apps/web) is deployed separately on Vercel, not here.
+services:
+  - type: web
+    name: gamescounter-server
+    runtime: node
+    plan: free
+    # Build from the repo ROOT (not apps/server) so npm workspaces can resolve
+    # the @gamescounter/games dependency.
+    rootDir: .
+    buildCommand: npm install --legacy-peer-deps
+    startCommand: npm run start:server
+    envVars:
+      # Render injects PORT automatically — the server reads process.env.PORT.
+      - key: CLIENT_ORIGIN
+        sync: false # set this to your Vercel URL in the dashboard after deploy
