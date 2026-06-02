@@ -195,8 +195,8 @@ export const FiveHundred: Game<
 
       meld.cards = res.cards;
       G.hands[playerID] = hand.filter((c) => !cardIds.includes(c.id));
-      G.mustMeld = false;
-      G.meldedThisTurn = true;
+      // NB: extending does NOT satisfy the "take the pile → lay a meld"
+      // obligation; only a brand-new meld (playMeld) clears `mustMeld`.
       G.log.push(`${tag(playerID)} added cards to the table.`);
     },
 
@@ -216,7 +216,9 @@ export const FiveHundred: Game<
       const joker = placed.card;
       meld.cards[placedIndex] = {
         card: real,
-        placedBy: playerID,
+        // The meld slot keeps belonging to whoever placed the joker — the
+        // swapper only gains the joker for their own hand, not the points.
+        placedBy: placed.placedBy,
         asRank: placed.asRank,
         asSuit: placed.asSuit,
       };
