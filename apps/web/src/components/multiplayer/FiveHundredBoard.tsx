@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BoardProps } from "boardgame.io/react";
 import {
   cardValue,
@@ -372,40 +372,50 @@ export function FiveHundredBoard({
         {G.melds.length === 0 ? (
           <p className="text-sm text-white/40">No melds yet.</p>
         ) : (
-          <div className="flex flex-col gap-2">
-            {G.melds.map((meld) => (
-              <div
-                key={meld.id}
-                className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2"
-              >
-                <span className="text-lg" aria-hidden>
-                  {SUIT_SYMBOL[meld.suit]}
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {meld.cards.map((placed, idx) => (
-                    <div key={idx} className="flex flex-col items-center">
-                      {placed.card.isJoker ? (
-                        <JokerOnTable placed={placed} />
-                      ) : (
-                        <CardFace card={placed.card} />
-                      )}
-                      <span className="text-[10px] text-white/40">
-                        {nameFor(placed.placedBy).split(" ")[0]}
-                      </span>
-                      {myTurn && !paused && canSwap(placed) && (
-                        <button
-                          type="button"
-                          onClick={() => moves.swapJoker(meld.id, idx)}
-                          className="mt-0.5 rounded bg-emerald-500/30 px-1 text-[10px] font-semibold"
-                        >
-                          swap
-                        </button>
-                      )}
-                    </div>
-                  ))}
+          // One row per suit; separate runs in a suit are spaced apart.
+          <div className="flex flex-col gap-3">
+            {(["heart", "diamond", "spade", "club"] as Suit[]).map((suit) => {
+              const suitMelds = G.melds.filter((m) => m.suit === suit);
+              if (suitMelds.length === 0) return null;
+              const red = SUIT_COLOR[suit] === "red";
+              return (
+                <div key={suit} className="flex items-start gap-2">
+                  <span
+                    className={`mt-3 w-5 shrink-0 text-center text-xl ${red ? "suit-red" : "text-white/80"}`}
+                    aria-hidden
+                  >
+                    {SUIT_SYMBOL[suit]}
+                  </span>
+                  <div className="flex flex-wrap items-start gap-x-6 gap-y-2 overflow-x-auto">
+                    {suitMelds.map((meld) => (
+                      <div key={meld.id} className="flex items-start gap-1">
+                        {meld.cards.map((placed, idx) => (
+                          <div key={idx} className="flex flex-col items-center">
+                            {placed.card.isJoker ? (
+                              <JokerOnTable placed={placed} />
+                            ) : (
+                              <CardFace card={placed.card} />
+                            )}
+                            <span className="text-[10px] text-white/40">
+                              {nameFor(placed.placedBy).split(" ")[0]}
+                            </span>
+                            {myTurn && !paused && canSwap(placed) && (
+                              <button
+                                type="button"
+                                onClick={() => moves.swapJoker(meld.id, idx)}
+                                className="mt-0.5 rounded bg-emerald-500/30 px-1 text-[10px] font-semibold"
+                              >
+                                swap
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -443,63 +453,17 @@ export function FiveHundredBoard({
           </h3>
           <span className="text-xs text-white/50">{myHand.length} cards</span>
         </div>
-        {/* One row per suit, with gaps where ranks are missing. */}
-        <div className="flex flex-col gap-2">
-          {(["heart", "diamond", "spade", "club"] as Suit[]).map((suit) => {
-            const cards = myHand
-              .filter((c) => !c.isJoker && c.suit === suit)
-              .sort((a, b) => a.rank - b.rank);
-            if (cards.length === 0) return null;
-            const red = SUIT_COLOR[suit] === "red";
-            const row: ReactNode[] = [];
-            let prev: number | null = null;
-            for (const card of cards) {
-              if (prev !== null && card.rank - prev > 1) {
-                row.push(<Gap key={`gap-${suit}-${card.rank}`} count={card.rank - prev - 1} />);
-              }
-              row.push(
-                <HandCard
-                  key={card.id}
-                  card={card}
-                  selected={selected.includes(card.id)}
-                  drawn={card.id === justDrew}
-                  onClick={() => toggleSelect(card.id)}
-                />
-              );
-              prev = card.rank;
-            }
-            return (
-              <div key={suit} className="flex items-center gap-1">
-                <span
-                  className={`w-5 shrink-0 text-center text-xl ${red ? "suit-red" : "text-white/80"}`}
-                  aria-hidden
-                >
-                  {SUIT_SYMBOL[suit]}
-                </span>
-                <div className="flex items-end gap-1 overflow-x-auto pb-1">{row}</div>
-              </div>
-            );
-          })}
-          {myHand.some((c) => c.isJoker) && (
-            <div className="flex items-center gap-1">
-              <span className="w-5 shrink-0 text-center text-base text-fuchsia-300" aria-hidden>
-                ★
-              </span>
-              <div className="flex items-end gap-1">
-                {myHand
-                  .filter((c) => c.isJoker)
-                  .map((card) => (
-                    <HandCard
-                      key={card.id}
-                      card={card}
-                      selected={selected.includes(card.id)}
-                      drawn={card.id === justDrew}
-                      onClick={() => toggleSelect(card.id)}
-                    />
-                  ))}
-              </div>
-            </div>
-          )}
+        {/* Single row, sorted by suit then rank. */}
+        <div className="flex flex-wrap gap-1.5">
+          {myHand.map((card) => (
+            <HandCard
+              key={card.id}
+              card={card}
+              selected={selected.includes(card.id)}
+              drawn={card.id === justDrew}
+              onClick={() => toggleSelect(card.id)}
+            />
+          ))}
           {myHand.length === 0 && <span className="text-sm text-white/40">Empty hand.</span>}
         </div>
 
@@ -707,19 +671,6 @@ function HandCard({
       </span>
       <CardFace card={card} selectable selected={selected} onClick={onClick} />
     </div>
-  );
-}
-
-/** Visible gap standing in for `count` missing ranks between two cards. */
-function Gap({ count }: { count: number }) {
-  return (
-    <span
-      className="inline-flex shrink-0 items-center justify-center self-end pb-3"
-      style={{ width: Math.min(10 + count * 6, 44) }}
-      aria-hidden
-    >
-      <span className="h-10 border-l border-dashed border-white/25" />
-    </span>
   );
 }
 
