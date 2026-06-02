@@ -45,6 +45,7 @@ export function meldingOpen(turnsThisRound: number, numPlayers: number): boolean
 /** Match-creation options chosen by the host. */
 export interface FiveHundredSetupData {
   jokers?: number;
+  winningScore?: number;
 }
 
 export const FiveHundred: Game<
@@ -60,6 +61,9 @@ export const FiveHundred: Game<
     const playerIDs = ctx.playOrder;
     // Host picks the joker count (0–4) when creating the match; default 2.
     const jokers = Math.max(0, Math.min(4, Math.floor(setupData?.jokers ?? 2)));
+    // Host picks the winning score (100–1000, in hundreds); default 500.
+    const winningScore =
+      Math.max(1, Math.min(10, Math.round((setupData?.winningScore ?? WIN_SCORE) / 100))) * 100;
     const { hands, stock, faceUp } = dealRound(playerIDs, (a) => random.Shuffle(a), jokers);
     const scores: Record<PlayerID, number> = Object.fromEntries(
       playerIDs.map((id) => [id, 0])
@@ -71,6 +75,7 @@ export const FiveHundred: Game<
       melds: [],
       scores,
       jokers,
+      winningScore,
       roundNumber: 1,
       turnsThisRound: 0,
       closedBy: null,
@@ -288,9 +293,9 @@ export const FiveHundred: Game<
 
       // Game ends once anyone reaches the winning score; otherwise pause and hand
       // control to the host (seat 0), who starts the next round.
-      if (ctx.playOrder.some((id) => G.scores[id] >= WIN_SCORE)) {
+      if (ctx.playOrder.some((id) => G.scores[id] >= G.winningScore)) {
         G.finished = true;
-        G.log.push(`Someone reached ${WIN_SCORE} — game over.`);
+        G.log.push(`Someone reached ${G.winningScore} — game over.`);
       } else {
         G.roundOver = true;
         events.endTurn({ next: "0" });
