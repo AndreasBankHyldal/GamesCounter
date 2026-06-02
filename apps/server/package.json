@@ -11,11 +11,13 @@
   "dependencies": {
     "@gamescounter/games": "*",
     "boardgame.io": "^0.50.2",
+    "pg": "^8.13.1",
     "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/koa": "^2.15.0",
     "@types/node": "^20",
+    "@types/pg": "^8.11.10",
     "typescript": "^5"
   }
 }
