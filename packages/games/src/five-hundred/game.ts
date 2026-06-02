@@ -34,6 +34,14 @@ function tag(playerID: PlayerID) {
   return `@@${playerID}@@`;
 }
 
+/**
+ * Whether laying down / extending melds (and taking the whole pile) is allowed
+ * yet: only once every player has had a turn in the current hand.
+ */
+export function meldingOpen(turnsThisRound: number, numPlayers: number): boolean {
+  return turnsThisRound > numPlayers;
+}
+
 /** Match-creation options chosen by the host. */
 export interface FiveHundredSetupData {
   jokers?: number;
@@ -64,6 +72,7 @@ export const FiveHundred: Game<
       scores,
       jokers,
       roundNumber: 1,
+      turnsThisRound: 0,
       closedBy: null,
       closingCard: null,
       roundOver: false,
@@ -88,6 +97,7 @@ export const FiveHundred: Game<
       G.mustMeld = false;
       G.meldedThisTurn = false;
       G.lastDrawnId = null;
+      G.turnsThisRound += 1;
     },
   },
 
@@ -122,9 +132,11 @@ export const FiveHundred: Game<
       G.log.push(`${tag(playerID)} drew from the pile.`);
     },
 
-    takeFaceUpPile: ({ G, playerID }) => {
+    takeFaceUpPile: ({ G, ctx, playerID }) => {
       if (G.roundOver || G.finished) return INVALID_MOVE;
       if (G.hasDrawn) return INVALID_MOVE;
+      // Taking the whole pile commits you to melding, which isn't open yet.
+      if (!meldingOpen(G.turnsThisRound, ctx.numPlayers)) return INVALID_MOVE;
       if (G.faceUp.length === 0) return INVALID_MOVE;
       G.hands[playerID].push(...G.faceUp);
       G.faceUp = [];
@@ -137,12 +149,13 @@ export const FiveHundred: Game<
 
     // ---- Meld phase (optional, any number per turn after drawing) ----
     playMeld: (
-      { G, playerID },
+      { G, ctx, playerID },
       cardIds: string[],
       declarations: Declaration[] = []
     ) => {
       if (G.roundOver || G.finished) return INVALID_MOVE;
       if (!G.hasDrawn) return INVALID_MOVE;
+      if (!meldingOpen(G.turnsThisRound, ctx.numPlayers)) return INVALID_MOVE;
       const hand = G.hands[playerID];
       const cards = cardIds
         .map((id) => hand.find((c) => c.id === id))
@@ -161,13 +174,14 @@ export const FiveHundred: Game<
     },
 
     extendMeld: (
-      { G, playerID },
+      { G, ctx, playerID },
       meldId: string,
       cardIds: string[],
       declarations: Declaration[] = []
     ) => {
       if (G.roundOver || G.finished) return INVALID_MOVE;
       if (!G.hasDrawn) return INVALID_MOVE;
+      if (!meldingOpen(G.turnsThisRound, ctx.numPlayers)) return INVALID_MOVE;
       const meld = G.melds.find((m) => m.id === meldId);
       if (!meld) return INVALID_MOVE;
       const hand = G.hands[playerID];
@@ -288,6 +302,7 @@ export const FiveHundred: Game<
       G.roundOver = false;
       G.lastRound = null;
       G.roundNumber += 1;
+      G.turnsThisRound = 0; // melding is closed again until everyone has played
       G.log.push(`Round ${G.roundNumber} dealt.`);
       // Rotate who leads: round 1 → seat 0, round 2 → seat 1, …
       const starter = String((G.roundNumber - 1) % ctx.numPlayers);
