@@ -4,11 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { joinRoom } from "@/lib/multiplayer/lobby";
 import { saveIdentity } from "@/lib/multiplayer/identity";
+import { useRandomAvatar } from "@/lib/multiplayer/useRandomAvatar";
+import { AvatarField } from "./AvatarField";
 
 export function JoinForm() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [avatar, setAvatar] = useRandomAvatar();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,8 +26,14 @@ export function JoinForm() {
     setBusy(true);
     setError(null);
     try {
-      const { playerID, playerCredentials } = await joinRoom(room, player);
-      saveIdentity(room, { playerID, credentials: playerCredentials, name: player });
+      const { playerID, playerCredentials } = await joinRoom(room, player, avatar);
+      saveIdentity(room, {
+        playerID,
+        credentials: playerCredentials,
+        name: player,
+        avatarStyle: avatar.styleKey,
+        avatarSeed: avatar.seed,
+      });
       router.push(`/play/${room}`);
     } catch {
       setError("Couldn't join — check the code, or the room may be full.");
@@ -42,13 +51,16 @@ export function JoinForm() {
         autoCapitalize="characters"
         className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-center text-2xl font-bold tracking-[0.3em] text-white placeholder:text-white/30 placeholder:tracking-normal placeholder:text-base"
       />
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Your name"
-        maxLength={20}
-        className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-white placeholder:text-white/30"
-      />
+      <div className="flex items-center gap-3">
+        <AvatarField value={avatar} onChange={setAvatar} size={56} />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Your name"
+          maxLength={20}
+          className="flex-1 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-white placeholder:text-white/30"
+        />
+      </div>
       {error && <p className="text-sm text-rose-300">{error}</p>}
       <button
         type="submit"
