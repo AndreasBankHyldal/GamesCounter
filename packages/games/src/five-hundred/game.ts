@@ -99,6 +99,18 @@ export const FiveHundred: Game<
       G.lastDrawnId = null;
       G.turnsThisRound += 1;
     },
+    // If you took the whole pile but never laid down a NEW meld, you lose 50 —
+    // applied here so it fires no matter how the turn ends (discard, pass, …).
+    // (closeHand handles its own case before round scoring / at game over.)
+    onEnd: ({ G, ctx }) => {
+      if (G.mustMeld && !G.meldedThisTurn) {
+        G.scores[ctx.currentPlayer] -= PILE_PENALTY;
+        G.mustMeld = false;
+        G.log.push(
+          `${tag(ctx.currentPlayer)} took the pile without melding (−${PILE_PENALTY}).`
+        );
+      }
+    },
   },
 
   moves: {
@@ -235,12 +247,7 @@ export const FiveHundred: Game<
       const card = hand.find((c) => c.id === cardId);
       if (!card) return INVALID_MOVE;
 
-      if (G.mustMeld && !G.meldedThisTurn) {
-        G.scores[playerID] -= PILE_PENALTY;
-        G.mustMeld = false;
-        G.log.push(`${tag(playerID)} took the pile without melding (−${PILE_PENALTY}).`);
-      }
-
+      // The take-pile penalty (if owed) is applied in turn.onEnd.
       G.hands[playerID] = hand.filter((c) => c.id !== cardId);
       G.faceUp.push(card);
       G.log.push(`${tag(playerID)} discarded.`);
