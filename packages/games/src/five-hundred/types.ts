@@ -49,6 +49,8 @@ export interface FiveHundredState {
   melds: Meld[];
   /** Cumulative scores across rounds. */
   scores: Record<PlayerID, number>;
+  /** Number of jokers in the deck (0–4), chosen at match creation. */
+  jokers: number;
   roundNumber: number;
   /** Player who closed the current round, else null. */
   closedBy: PlayerID | null;
