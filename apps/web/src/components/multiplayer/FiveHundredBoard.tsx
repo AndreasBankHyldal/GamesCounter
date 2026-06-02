@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BoardProps } from "boardgame.io/react";
 import {
   cardValue,
@@ -37,10 +37,6 @@ function sortHand(cards: Card[]): Card[] {
 
 function isRed(card: Card): boolean {
   return !card.isJoker && SUIT_COLOR[card.suit as Suit] === "red";
-}
-
-function placedJokerLabel(placed: PlacedCard): string {
-  return `${RANK_LABEL[placed.asRank] ?? placed.asRank}${SUIT_SYMBOL[placed.asSuit]}`;
 }
 
 export function FiveHundredBoard({
@@ -82,11 +78,9 @@ export function FiveHundredBoard({
 
   const myHand = useMemo(() => sortHand(G.hands[me] ?? []), [G.hands, me]);
   const others = ctx.playOrder.filter((id) => id !== me);
-
-  // When you draw, the new card comes in pre-selected (as if you tapped it).
-  useEffect(() => {
-    if (G.lastDrawnId) setSelected([G.lastDrawnId]);
-  }, [G.lastDrawnId]);
+  // The card you just drew (only meaningful in your own hand) — marked with an
+  // arrow rather than auto-selected, so the selection never changes on its own.
+  const justDrew = myHand.some((c) => c.id === G.lastDrawnId) ? G.lastDrawnId : null;
 
   function nameFor(pid: string): string {
     const entry = matchData?.find((p) => String(p.id) === pid);
@@ -139,6 +133,11 @@ export function FiveHundredBoard({
     selectedCards.length >= 1 && jokersDeclared()
       ? G.melds.find((m) => validateExtend(m, selectedCards, declarations, me).ok)
       : undefined;
+  // Whether the current selection forms a valid brand-new run.
+  const selectionIsValidMeld =
+    selectedCards.length >= 3 &&
+    jokersDeclared() &&
+    validateNewMeld(selectedCards, declarations, me, "preview").ok;
 
   // ---- Move dispatch (with client-side pre-validation for instant feedback) ----
   function doMeld() {
@@ -178,9 +177,16 @@ export function FiveHundredBoard({
   }
 
   const faceUpTop = G.faceUp[G.faceUp.length - 1];
-  const canMeld = myTurn && G.hasDrawn && !paused && selectedCards.length >= 3;
+  const canMeld = myTurn && G.hasDrawn && !paused && selectionIsValidMeld;
   const canAdd = myTurn && G.hasDrawn && !paused && Boolean(extendableMeld);
-  const canDiscard = myTurn && G.hasDrawn && !paused && selected.length === 1 && myHand.length > 1;
+  // You can't discard a card that could be played onto a run on the table.
+  const canDiscard =
+    myTurn &&
+    G.hasDrawn &&
+    !paused &&
+    selected.length === 1 &&
+    myHand.length > 1 &&
+    !extendableMeld;
   const canClose = myTurn && G.hasDrawn && !paused && myHand.length === 1;
   const canPass = myTurn && G.hasDrawn && !paused && myHand.length === 0;
   const canDraw = myTurn && !G.hasDrawn && !paused;
@@ -379,7 +385,7 @@ export function FiveHundredBoard({
                   {meld.cards.map((placed, idx) => (
                     <div key={idx} className="flex flex-col items-center">
                       {placed.card.isJoker ? (
-                        <JokerOnTable label={placedJokerLabel(placed)} />
+                        <JokerOnTable placed={placed} />
                       ) : (
                         <CardFace card={placed.card} />
                       )}
@@ -437,17 +443,63 @@ export function FiveHundredBoard({
           </h3>
           <span className="text-xs text-white/50">{myHand.length} cards</span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {myHand.map((card) => (
-            <CardFace
-              key={card.id}
-              card={card}
-              selectable
-              selected={selected.includes(card.id)}
-              highlight={card.id === G.lastDrawnId}
-              onClick={() => toggleSelect(card.id)}
-            />
-          ))}
+        {/* One row per suit, with gaps where ranks are missing. */}
+        <div className="flex flex-col gap-2">
+          {(["heart", "diamond", "spade", "club"] as Suit[]).map((suit) => {
+            const cards = myHand
+              .filter((c) => !c.isJoker && c.suit === suit)
+              .sort((a, b) => a.rank - b.rank);
+            if (cards.length === 0) return null;
+            const red = SUIT_COLOR[suit] === "red";
+            const row: ReactNode[] = [];
+            let prev: number | null = null;
+            for (const card of cards) {
+              if (prev !== null && card.rank - prev > 1) {
+                row.push(<Gap key={`gap-${suit}-${card.rank}`} count={card.rank - prev - 1} />);
+              }
+              row.push(
+                <HandCard
+                  key={card.id}
+                  card={card}
+                  selected={selected.includes(card.id)}
+                  drawn={card.id === justDrew}
+                  onClick={() => toggleSelect(card.id)}
+                />
+              );
+              prev = card.rank;
+            }
+            return (
+              <div key={suit} className="flex items-center gap-1">
+                <span
+                  className={`w-5 shrink-0 text-center text-xl ${red ? "suit-red" : "text-white/80"}`}
+                  aria-hidden
+                >
+                  {SUIT_SYMBOL[suit]}
+                </span>
+                <div className="flex items-end gap-1 overflow-x-auto pb-1">{row}</div>
+              </div>
+            );
+          })}
+          {myHand.some((c) => c.isJoker) && (
+            <div className="flex items-center gap-1">
+              <span className="w-5 shrink-0 text-center text-base text-fuchsia-300" aria-hidden>
+                ★
+              </span>
+              <div className="flex items-end gap-1">
+                {myHand
+                  .filter((c) => c.isJoker)
+                  .map((card) => (
+                    <HandCard
+                      key={card.id}
+                      card={card}
+                      selected={selected.includes(card.id)}
+                      drawn={card.id === justDrew}
+                      onClick={() => toggleSelect(card.id)}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
           {myHand.length === 0 && <span className="text-sm text-white/40">Empty hand.</span>}
         </div>
 
@@ -475,6 +527,11 @@ export function FiveHundredBoard({
                 type="button"
                 disabled={!canDiscard}
                 onClick={doDiscard}
+                title={
+                  selected.length === 1 && extendableMeld
+                    ? "This card can be added to a run on the table — play it instead"
+                    : undefined
+                }
                 className="rounded-lg bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-30"
               >
                 Discard
@@ -579,23 +636,17 @@ function CardFace({
   large,
   selectable,
   selected,
-  highlight,
   onClick,
 }: {
   card: Card;
   large?: boolean;
   selectable?: boolean;
   selected?: boolean;
-  highlight?: boolean;
   onClick?: () => void;
 }) {
   const size = large ? "h-28 w-20" : "h-16 w-11";
   const Tag = selectable ? "button" : "div";
-  const ring = selected
-    ? "-translate-y-2 ring-2 ring-amber-400"
-    : highlight
-      ? "ring-4 ring-yellow-400"
-      : "";
+  const ring = selected ? "-translate-y-2 ring-2 ring-amber-400" : "";
 
   if (card.isJoker) {
     return (
@@ -632,11 +683,56 @@ function CardFace({
   );
 }
 
-/** A joker sitting in a meld: shows the represented card with a wild badge. */
-function JokerOnTable({ label }: { label: string }) {
+/** A hand card with a reserved slot above it for the "just drawn" arrow. */
+function HandCard({
+  card,
+  selected,
+  drawn,
+  onClick,
+}: {
+  card: Card;
+  selected: boolean;
+  drawn: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div className="relative flex h-16 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-fuchsia-400 bg-white text-lg font-bold text-neutral-900 shadow">
-      {label}
+    <div className="flex flex-col items-center">
+      <span
+        className={`h-4 text-base leading-none ${
+          drawn ? "animate-bounce text-amber-300" : "text-transparent"
+        }`}
+        aria-hidden
+      >
+        ▾
+      </span>
+      <CardFace card={card} selectable selected={selected} onClick={onClick} />
+    </div>
+  );
+}
+
+/** Visible gap standing in for `count` missing ranks between two cards. */
+function Gap({ count }: { count: number }) {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center self-end pb-3"
+      style={{ width: Math.min(10 + count * 6, 44) }}
+      aria-hidden
+    >
+      <span className="h-10 border-l border-dashed border-white/25" />
+    </span>
+  );
+}
+
+/** A joker sitting in a meld: shows the represented card with a wild badge. */
+function JokerOnTable({ placed }: { placed: PlacedCard }) {
+  const rank = RANK_LABEL[placed.asRank] ?? placed.asRank;
+  const red = SUIT_COLOR[placed.asSuit] === "red";
+  return (
+    <div className="relative flex h-16 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-fuchsia-400 bg-white text-lg font-bold shadow">
+      <span className="text-neutral-900">{rank}</span>
+      <span className={red ? "text-card-red" : "text-neutral-900"}>
+        {SUIT_SYMBOL[placed.asSuit]}
+      </span>
       <span className="absolute -right-1 -top-1 rounded-full bg-fuchsia-500 px-1 text-[9px] font-bold text-white">
         J
       </span>

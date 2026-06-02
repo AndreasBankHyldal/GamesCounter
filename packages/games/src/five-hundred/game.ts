@@ -1,6 +1,6 @@
 import type { Game } from "boardgame.io";
 import { INVALID_MOVE } from "boardgame.io/core";
-import { buildDeck, formatCard, type Card } from "../cards";
+import { buildDeck, type Card } from "../cards";
 import {
   jokerRepresents,
   validateExtend,
@@ -82,6 +82,7 @@ export const FiveHundred: Game<FiveHundredState> = {
   moves: {
     // ---- Draw phase (exactly one of these per turn) ----
     drawFromStock: ({ G, playerID, random }) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       if (G.hasDrawn) return INVALID_MOVE;
       if (G.stock.length === 0) {
         // Stock empty: reshuffle the face-up pile (keeping its top) into a new
@@ -99,16 +100,18 @@ export const FiveHundred: Game<FiveHundredState> = {
     },
 
     drawFromFaceUp: ({ G, playerID }) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       if (G.hasDrawn) return INVALID_MOVE;
       if (G.faceUp.length === 0) return INVALID_MOVE;
       const card = G.faceUp.pop()!;
       G.hands[playerID].push(card);
       G.hasDrawn = true;
       G.lastDrawnId = card.id;
-      G.log.push(`${tag(playerID)} took ${formatCard(card)} from the pile.`);
+      G.log.push(`${tag(playerID)} drew from the pile.`);
     },
 
     takeFaceUpPile: ({ G, playerID }) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       if (G.hasDrawn) return INVALID_MOVE;
       if (G.faceUp.length === 0) return INVALID_MOVE;
       G.hands[playerID].push(...G.faceUp);
@@ -126,6 +129,7 @@ export const FiveHundred: Game<FiveHundredState> = {
       cardIds: string[],
       declarations: Declaration[] = []
     ) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       if (!G.hasDrawn) return INVALID_MOVE;
       const hand = G.hands[playerID];
       const cards = cardIds
@@ -141,9 +145,7 @@ export const FiveHundred: Game<FiveHundredState> = {
       G.melds.push(res.meld);
       G.mustMeld = false;
       G.meldedThisTurn = true;
-      G.log.push(
-        `${tag(playerID)} melded ${res.meld.cards.map((c) => formatCard(c.card)).join(" ")}.`
-      );
+      G.log.push(`${tag(playerID)} laid down a meld.`);
     },
 
     extendMeld: (
@@ -152,6 +154,7 @@ export const FiveHundred: Game<FiveHundredState> = {
       cardIds: string[],
       declarations: Declaration[] = []
     ) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       if (!G.hasDrawn) return INVALID_MOVE;
       const meld = G.melds.find((m) => m.id === meldId);
       if (!meld) return INVALID_MOVE;
@@ -168,11 +171,12 @@ export const FiveHundred: Game<FiveHundredState> = {
       G.hands[playerID] = hand.filter((c) => !cardIds.includes(c.id));
       G.mustMeld = false;
       G.meldedThisTurn = true;
-      G.log.push(`${tag(playerID)} added to a ${meld.suit} run.`);
+      G.log.push(`${tag(playerID)} added cards to the table.`);
     },
 
     // ---- Joker swap (on your turn, if you hold the represented real card) ----
     swapJoker: ({ G, playerID }, meldId: string, placedIndex: number) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       const meld = G.melds.find((m) => m.id === meldId);
       if (!meld) return INVALID_MOVE;
       const placed = meld.cards[placedIndex];
@@ -197,6 +201,7 @@ export const FiveHundred: Game<FiveHundredState> = {
     // ---- End of turn ----
     // Normal face-up discard: pile stays open, next player's turn.
     discard: ({ G, playerID, events }, cardId: string) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       if (!G.hasDrawn) return INVALID_MOVE;
       const hand = G.hands[playerID];
       const card = hand.find((c) => c.id === cardId);
@@ -210,12 +215,13 @@ export const FiveHundred: Game<FiveHundredState> = {
 
       G.hands[playerID] = hand.filter((c) => c.id !== cardId);
       G.faceUp.push(card);
-      G.log.push(`${tag(playerID)} discarded ${formatCard(card)}.`);
+      G.log.push(`${tag(playerID)} discarded.`);
       events.endTurn();
     },
 
     // Played the whole hand onto the table — go out and pass to the next player.
     passTurn: ({ G, playerID, events }) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       if (!G.hasDrawn) return INVALID_MOVE;
       if (G.hands[playerID].length !== 0) return INVALID_MOVE;
       G.log.push(`${tag(playerID)} played their last card and passed.`);
@@ -224,7 +230,8 @@ export const FiveHundred: Game<FiveHundredState> = {
 
     // Close the hand: place your final card face-down on the pile, ending the
     // round. The round is scored (+melds on the table, −cards left in hand).
-    closeHand: ({ G, ctx, playerID }, cardId: string) => {
+    closeHand: ({ G, ctx, playerID, events }, cardId: string) => {
+      if (G.roundOver || G.finished) return INVALID_MOVE;
       if (!G.hasDrawn) return INVALID_MOVE;
       const hand = G.hands[playerID];
       if (hand.length !== 1) return INVALID_MOVE;
@@ -244,18 +251,19 @@ export const FiveHundred: Game<FiveHundredState> = {
       G.lastRound = result;
       G.log.push(`${tag(playerID)} closed round ${G.roundNumber}.`);
 
-      // Game ends once anyone reaches the winning score; otherwise pause for a
-      // "continue to next round" from the player who closed.
+      // Game ends once anyone reaches the winning score; otherwise pause and hand
+      // control to the host (seat 0), who starts the next round.
       if (ctx.playOrder.some((id) => G.scores[id] >= WIN_SCORE)) {
         G.finished = true;
         G.log.push(`Someone reached ${WIN_SCORE} — game over.`);
       } else {
         G.roundOver = true;
+        events.endTurn({ next: "0" });
       }
     },
 
-    // Deal the next round (after a close, when nobody has won yet).
-    nextRound: ({ G, random, events }) => {
+    // Host (seat 0) deals the next round; the first player rotates each round.
+    nextRound: ({ G, ctx, random, events }) => {
       if (!G.roundOver || G.finished) return INVALID_MOVE;
       const playerIDs = Object.keys(G.hands);
       const next = dealRound(playerIDs, (a) => random.Shuffle(a));
@@ -269,7 +277,9 @@ export const FiveHundred: Game<FiveHundredState> = {
       G.lastRound = null;
       G.roundNumber += 1;
       G.log.push(`Round ${G.roundNumber} dealt.`);
-      events.endTurn(); // next round starts with the following player
+      // Rotate who leads: round 1 → seat 0, round 2 → seat 1, …
+      const starter = String((G.roundNumber - 1) % ctx.numPlayers);
+      events.endTurn({ next: starter });
     },
   },
 
