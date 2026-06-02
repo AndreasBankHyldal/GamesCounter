@@ -139,6 +139,15 @@ export function FiveHundredBoard({
     jokersDeclared() &&
     validateNewMeld(selectedCards, declarations, me, "preview").ok;
 
+  // Can your single last card be added to a run on the table? (A joker fits any
+  // existing run.) If so, you must play it rather than close with it.
+  const lastCard = myHand.length === 1 ? myHand[0] : undefined;
+  const lastCardPlayable = lastCard
+    ? lastCard.isJoker
+      ? G.melds.length > 0
+      : G.melds.some((m) => validateExtend(m, [lastCard], [], me).ok)
+    : false;
+
   // ---- Move dispatch (with client-side pre-validation for instant feedback) ----
   function doMeld() {
     if (selectedCards.length < 3) return setError("Pick at least 3 cards.");
@@ -187,7 +196,8 @@ export function FiveHundredBoard({
     selected.length === 1 &&
     myHand.length > 1 &&
     !extendableMeld;
-  const canClose = myTurn && G.hasDrawn && !paused && myHand.length === 1;
+  const canClose =
+    myTurn && G.hasDrawn && !paused && myHand.length === 1 && !lastCardPlayable;
   const canPass = myTurn && G.hasDrawn && !paused && myHand.length === 0;
   const canDraw = myTurn && !G.hasDrawn && !paused;
 
@@ -512,7 +522,11 @@ export function FiveHundredBoard({
                 <button
                   type="button"
                   disabled={!canClose}
-                  title="Place your last card face-down to close the round"
+                  title={
+                    lastCardPlayable
+                      ? "Your last card can be played on the table — you can't close with it"
+                      : "Place your last card face-down to close the round"
+                  }
                   onClick={doClose}
                   className="rounded-lg bg-amber-500/80 px-4 py-2 text-sm font-semibold text-black disabled:opacity-30"
                 >
