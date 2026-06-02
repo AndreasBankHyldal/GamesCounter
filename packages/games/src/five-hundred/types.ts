@@ -50,6 +50,9 @@ export interface FiveHundredState {
   /** Cumulative scores across rounds. */
   scores: Record<PlayerID, number>;
   roundNumber: number;
+  /** Turns taken so far in the current hand (resets each deal). Melding only
+   * opens once this exceeds the player count — i.e. everyone has had one turn. */
+  turnsThisRound: number;
   /** Player who closed the current round, else null. */
   closedBy: PlayerID | null;
   /** The face-down card placed on the pile when closing — revealable on peek. */

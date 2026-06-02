@@ -5,6 +5,7 @@ import type { BoardProps } from "boardgame.io/react";
 import {
   cardValue,
   jokerRepresents,
+  meldingOpen,
   RANK_LABEL,
   SUIT_COLOR,
   SUIT_SYMBOL,
@@ -177,8 +178,10 @@ export function FiveHundredBoard({
   }
 
   const faceUpTop = G.faceUp[G.faceUp.length - 1];
-  const canMeld = myTurn && G.hasDrawn && !paused && selectionIsValidMeld;
-  const canAdd = myTurn && G.hasDrawn && !paused && Boolean(extendableMeld);
+  // Melding (and taking the whole pile) only opens after everyone's first turn.
+  const meldsOpen = meldingOpen(G.turnsThisRound, ctx.numPlayers);
+  const canMeld = myTurn && G.hasDrawn && !paused && meldsOpen && selectionIsValidMeld;
+  const canAdd = myTurn && G.hasDrawn && !paused && meldsOpen && Boolean(extendableMeld);
   // You can't discard a card that could be played onto a run on the table.
   const canDiscard =
     myTurn &&
@@ -347,8 +350,12 @@ export function FiveHundredBoard({
             </button>
             <button
               type="button"
-              disabled={!canDraw || G.faceUp.length === 0}
-              title="Take the whole pile (then meld or −50)"
+              disabled={!canDraw || G.faceUp.length === 0 || !meldsOpen}
+              title={
+                !meldsOpen
+                  ? "Opens once everyone has had a turn"
+                  : "Take the whole pile (then meld or −50)"
+              }
               onClick={() => moves.takeFaceUpPile()}
               className="rounded-lg bg-white/15 px-2 py-1.5 text-xs font-semibold disabled:opacity-30"
             >
@@ -357,6 +364,12 @@ export function FiveHundredBoard({
           </div>
         </div>
       </div>
+
+      {myTurn && !paused && !meldsOpen && (
+        <p className="rounded-lg bg-white/10 px-3 py-2 text-center text-xs text-white/70">
+          Melding opens once everyone has had their first turn.
+        </p>
+      )}
 
       {G.mustMeld && myTurn && !paused && (
         <p className="rounded-lg bg-rose-500/20 px-3 py-2 text-center text-xs text-rose-100">
