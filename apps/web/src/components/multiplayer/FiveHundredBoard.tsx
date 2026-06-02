@@ -233,7 +233,7 @@ export function FiveHundredBoard({
   const canDraw = myTurn && !G.hasDrawn && !paused;
 
   return (
-    <div className="felt flex min-h-screen flex-col gap-4 px-4 pb-8 pt-14 text-white">
+    <div className="felt flex min-h-screen flex-col gap-4 px-4 pb-8 pt-14 text-white lg:h-screen lg:gap-3 lg:overflow-hidden">
       {/* Status bar (pushed below the Leave button) */}
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
@@ -341,6 +341,10 @@ export function FiveHundredBoard({
         </div>
       )}
 
+      {/* Main content — one column on mobile, two columns on desktop */}
+      <div className="flex flex-1 flex-col gap-4 lg:min-h-0 lg:flex-row lg:gap-5">
+      {/* Left column: the table (opponents, piles, melds) fills the height */}
+      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1">
       {/* Opponents */}
       <div className="flex flex-wrap gap-2">
         {others.map((pid) => (
@@ -429,7 +433,7 @@ export function FiveHundredBoard({
       )}
 
       {/* Melds on the table */}
-      <div>
+      <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/50">
           Melds on the table
         </h3>
@@ -450,7 +454,7 @@ export function FiveHundredBoard({
                   >
                     {SUIT_SYMBOL[suit]}
                   </span>
-                  <div className="flex flex-wrap items-start gap-x-6 gap-y-2 overflow-x-auto">
+                  <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
                     {suitMelds.map((meld) => (
                       <div key={meld.id} className="flex items-start gap-1">
                         {meld.cards.map((placed, idx) => (
@@ -483,7 +487,11 @@ export function FiveHundredBoard({
           </div>
         )}
       </div>
+      </div>
+      {/* /Left column */}
 
+      {/* Right column: declarations, your hand, actions, log */}
+      <div className="flex flex-col gap-4 lg:w-[440px] lg:min-h-0 lg:shrink-0 lg:overflow-y-auto">
       {/* Declarations for jokers in the current selection */}
       {!paused && hasJoker && (
         <div className="rounded-xl border border-white/15 bg-black/20 p-3">
@@ -509,7 +517,7 @@ export function FiveHundredBoard({
       )}
 
       {/* Your hand */}
-      <div className="mt-auto">
+      <div>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <AvatarChip a={avatars[me]} size={24} />
@@ -642,6 +650,10 @@ export function FiveHundredBoard({
           ))}
         </ul>
       </details>
+      </div>
+      {/* /Right column */}
+      </div>
+      {/* /Main content */}
     </div>
   );
 }
