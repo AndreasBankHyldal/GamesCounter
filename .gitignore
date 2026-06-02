@@ -25,6 +25,9 @@ dist/
 .DS_Store
 *.pem
 
+# IDE
+.idea/
+
 # local claude settings
 .claude/settings.local.json
 
