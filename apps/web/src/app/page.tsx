@@ -58,6 +58,30 @@ export default function Home() {
           ))}
         </ul>
       </section>
+
+      {/* Multiplayer */}
+      <section className="mt-10 w-full max-w-md">
+        <h2 className="mb-4 text-center text-sm font-semibold uppercase tracking-widest text-white/50">
+          Or play online
+        </h2>
+        <Link
+          href="/play"
+          className="game-card flex items-center gap-4 rounded-2xl px-6 py-5 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+        >
+          <span
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/15 text-3xl"
+            aria-hidden
+          >
+            🌐
+          </span>
+          <span className="flex flex-col">
+            <span className="text-xl font-bold leading-tight">Play 500 online</span>
+            <span className="text-sm text-white/75">
+              Real cards, hidden hands, with friends
+            </span>
+          </span>
+        </Link>
+      </section>
     </main>
   );
 }
