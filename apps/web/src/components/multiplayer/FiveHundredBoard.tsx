@@ -133,6 +133,11 @@ export function FiveHundredBoard({
     selectedCards.length >= 1 && jokersDeclared()
       ? G.melds.find((m) => validateExtend(m, selectedCards, declarations, me).ok)
       : undefined;
+  // Whether the current selection forms a valid brand-new run.
+  const selectionIsValidMeld =
+    selectedCards.length >= 3 &&
+    jokersDeclared() &&
+    validateNewMeld(selectedCards, declarations, me, "preview").ok;
 
   // ---- Move dispatch (with client-side pre-validation for instant feedback) ----
   function doMeld() {
@@ -172,9 +177,16 @@ export function FiveHundredBoard({
   }
 
   const faceUpTop = G.faceUp[G.faceUp.length - 1];
-  const canMeld = myTurn && G.hasDrawn && !paused && selectedCards.length >= 3;
+  const canMeld = myTurn && G.hasDrawn && !paused && selectionIsValidMeld;
   const canAdd = myTurn && G.hasDrawn && !paused && Boolean(extendableMeld);
-  const canDiscard = myTurn && G.hasDrawn && !paused && selected.length === 1 && myHand.length > 1;
+  // You can't discard a card that could be played onto a run on the table.
+  const canDiscard =
+    myTurn &&
+    G.hasDrawn &&
+    !paused &&
+    selected.length === 1 &&
+    myHand.length > 1 &&
+    !extendableMeld;
   const canClose = myTurn && G.hasDrawn && !paused && myHand.length === 1;
   const canPass = myTurn && G.hasDrawn && !paused && myHand.length === 0;
   const canDraw = myTurn && !G.hasDrawn && !paused;
@@ -515,6 +527,11 @@ export function FiveHundredBoard({
                 type="button"
                 disabled={!canDiscard}
                 onClick={doDiscard}
+                title={
+                  selected.length === 1 && extendableMeld
+                    ? "This card can be added to a run on the table — play it instead"
+                    : undefined
+                }
                 className="rounded-lg bg-white/15 px-4 py-2 text-sm font-semibold disabled:opacity-30"
               >
                 Discard
