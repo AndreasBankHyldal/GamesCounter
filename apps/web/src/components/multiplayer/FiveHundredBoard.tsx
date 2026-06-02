@@ -668,8 +668,8 @@ export function FiveHundredBoard({
         <summary className="cursor-pointer select-none font-semibold">How to play</summary>
         <div className="mt-2 flex flex-col gap-2 leading-relaxed text-white/70">
           <p>
-            <strong className="text-white">Goal:</strong> be the first to 500 points across
-            rounds. On your turn: <em>draw</em>, optionally <em>meld</em>, then end your turn.
+            <strong className="text-white">Goal:</strong> be the first to {G.winningScore} points
+            across rounds. On your turn: <em>draw</em>, optionally <em>meld</em>, then end your turn.
           </p>
           <p>
             <strong className="text-white">Draw</strong> one card from the deck, take the top of
@@ -689,7 +689,8 @@ export function FiveHundredBoard({
           <p>
             <strong className="text-white">Scoring (each round):</strong> +points for cards you
             placed on the table, −points for cards left in your hand. Joker 25, ace 15, 10/J/Q/K
-            10, 2–9 = 5. Reduce to one card and “Close round” to end the round; first to 500 wins.
+            10, 2–9 = 5. Reduce to one card and “Close round” to end the round; first to{" "}
+            {G.winningScore} wins.
           </p>
         </div>
       </details>

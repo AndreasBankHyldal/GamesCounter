@@ -16,6 +16,7 @@ export function NewRoom() {
   const [name, setName] = useState("");
   const [count, setCount] = useState(2);
   const [jokers, setJokers] = useState(2);
+  const [winningScore, setWinningScore] = useState(500);
   const [avatar, setAvatar] = useRandomAvatar();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export function NewRoom() {
     setBusy(true);
     setError(null);
     try {
-      const code = await createRoom(count, { jokers });
+      const code = await createRoom(count, { jokers, winningScore });
       const { playerID, playerCredentials } = await joinRoom(code, player, avatar);
       saveIdentity(code, {
         playerID,
@@ -128,6 +129,30 @@ export function NewRoom() {
                 {n}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm font-semibold text-white">Winning score</p>
+            <p className="text-2xl font-bold tabular-nums text-amber-300">{winningScore}</p>
+          </div>
+          <p className="text-xs text-white/50">
+            First to this score wins. Lower = shorter game.
+          </p>
+          <input
+            type="range"
+            min={100}
+            max={1000}
+            step={100}
+            value={winningScore}
+            onChange={(e) => setWinningScore(Number(e.target.value))}
+            aria-label="Winning score"
+            className="mt-3 w-full accent-amber-400"
+          />
+          <div className="mt-1 flex justify-between text-[10px] text-white/40">
+            <span>100</span>
+            <span>1000</span>
           </div>
         </div>
 

@@ -51,6 +51,8 @@ export interface FiveHundredState {
   scores: Record<PlayerID, number>;
   /** Number of jokers in the deck (0–4), chosen at match creation. */
   jokers: number;
+  /** Cumulative score that wins the game (100–1000), chosen at match creation. */
+  winningScore: number;
   roundNumber: number;
   /** Turns taken so far in the current hand (resets each deal). Melding only
    * opens once this exceeds the player count — i.e. everyone has had one turn. */
