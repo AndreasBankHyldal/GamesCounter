@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { SUIT_SYMBOL, type Suit } from "@/lib/games";
 import {
   computeStandings,
+  DEFAULT_WINNING_SCORE,
   gabongHundredHits,
   makeRound,
   pirateRoundInfo,
@@ -77,7 +78,8 @@ export function GameScreen({
   const { players, rounds } = session;
   const isPirate = slug === "piratbridge";
   const lowerIsBetter = slug === "gabong";
-  const standings = computeStandings(slug, players, rounds);
+  const winningScore = session.winningScore ?? DEFAULT_WINNING_SCORE;
+  const standings = computeStandings(slug, players, rounds, winningScore);
   const finished = session.status === "finished";
 
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? "?";
@@ -87,13 +89,15 @@ export function GameScreen({
 
   const recomputeStatus = (rs: Round[]): GameStatus => {
     if (slug === "500" || slug === "gabong") {
-      return computeStandings(slug, players, rs).finished ? "finished" : "active";
+      return computeStandings(slug, players, rs, winningScore).finished
+        ? "finished"
+        : "active";
     }
     return rs.length > 0 && rs.every(roundComplete) ? "finished" : "active";
   };
 
   const buildResult = (rs: Round[]): ResultInfo | null => {
-    const s = computeStandings(slug, players, rs);
+    const s = computeStandings(slug, players, rs, winningScore);
     if (slug === "gabong") {
       if (!s.loserIds.length) return null;
       return {
@@ -107,7 +111,8 @@ export function GameScreen({
     return {
       emoji: "🏆",
       title: s.winnerIds.length > 1 ? "Winners!" : "Winner!",
-      caption: slug === "500" ? "First to 500 points!" : "Highest score wins",
+      caption:
+        slug === "500" ? `First to ${winningScore} points!` : "Highest score wins",
       highlightIds: s.winnerIds,
     };
   };
@@ -169,11 +174,11 @@ export function GameScreen({
       banner = `💥 ${[...losers].map(nameOf).join(", ")} busted — game over`;
     } else {
       banner = `👑 ${standings.winnerIds.map(nameOf).join(", ")} ${
-        slug === "500" ? "reached 500!" : "wins!"
+        slug === "500" ? `reached ${winningScore}!` : "wins!"
       }`;
     }
   } else if (slug === "500") {
-    banner = "First to 500 wins";
+    banner = `First to ${winningScore} wins`;
   } else if (slug === "gabong") {
     banner = "Avoid hitting 500 — that player loses";
   } else {

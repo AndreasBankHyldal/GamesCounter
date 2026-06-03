@@ -12,6 +12,8 @@ export interface GameSession {
   status: GameStatus;
   createdAt: number;
   updatedAt: number;
+  /** 500 only: the target score that wins the game. */
+  winningScore?: number;
 }
 
 const KEY = "gc:sessions";
@@ -78,7 +80,8 @@ function autoName(players: Player[], ts: number): string {
 export function createSession(
   slug: string,
   players: Player[],
-  startCards?: number
+  startCards?: number,
+  winningScore?: number
 ): GameSession {
   const now = Date.now();
   // Pirate Bridge has a fixed schedule of rounds; pre-create them empty.
@@ -99,6 +102,7 @@ export function createSession(
     status: "active",
     createdAt: now,
     updatedAt: now,
+    ...(slug === "500" && winningScore ? { winningScore } : {}),
   };
   return upsertSession(session);
 }
