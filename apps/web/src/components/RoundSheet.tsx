@@ -37,6 +37,16 @@ export function RoundSheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Phones show a numeric keypad with no minus key, so a tap-toggle is the
+  // reliable way to enter a negative score.
+  const toggleSign = (id: string) =>
+    setValues((prev) => {
+      const raw = (prev[id] ?? "").trim();
+      if (raw === "" || raw === "-") return { ...prev, [id]: "-" };
+      const next = raw.startsWith("-") ? raw.slice(1) : `-${raw}`;
+      return { ...prev, [id]: next };
+    });
+
   const save = () => {
     const scores: Record<string, number> = {};
     for (const p of players) {
@@ -80,6 +90,26 @@ export function RoundSheet({
                 <span className="min-w-0 flex-1 truncate font-medium text-white">
                   {p.name}
                 </span>
+                {(() => {
+                  const isNeg = (values[p.id] ?? "").trim().startsWith("-");
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => toggleSign(p.id)}
+                      aria-pressed={isNeg}
+                      aria-label={
+                        isNeg ? `Make ${p.name}'s score positive` : `Make ${p.name}'s score negative`
+                      }
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-2xl font-bold leading-none transition ${
+                        isNeg
+                          ? "border-card-red-light bg-card-red/30 text-white"
+                          : "border-white/15 bg-white/10 text-white/60 hover:text-white"
+                      }`}
+                    >
+                      {isNeg ? "−" : "+"}
+                    </button>
+                  );
+                })()}
                 <input
                   type="number"
                   inputMode="numeric"
@@ -88,7 +118,7 @@ export function RoundSheet({
                     setValues((prev) => ({ ...prev, [p.id]: e.target.value }))
                   }
                   placeholder="0"
-                  className="w-24 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-right text-lg font-semibold text-white placeholder:text-white/30 focus:border-card-red-light focus:outline-none"
+                  className="w-20 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-right text-lg font-semibold text-white placeholder:text-white/30 focus:border-card-red-light focus:outline-none"
                 />
               </li>
             ))}

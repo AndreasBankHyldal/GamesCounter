@@ -71,10 +71,14 @@ export function gabongHundredHits(
   return hits;
 }
 
+/** Default target for a 500 game when a session predates the slider. */
+export const DEFAULT_WINNING_SCORE = 500;
+
 export function computeStandings(
   slug: string,
   players: Player[],
-  rounds: Round[]
+  rounds: Round[],
+  winningScore: number = DEFAULT_WINNING_SCORE
 ): Standings {
   const ids = players.map((p) => p.id);
   const totals: Record<string, number> = Object.fromEntries(
@@ -111,7 +115,7 @@ export function computeStandings(
     );
     for (const round of rounds) {
       for (const id of ids) running[id] += round.scores[id] ?? 0;
-      const reached = ids.filter((id) => running[id] >= 500);
+      const reached = ids.filter((id) => running[id] >= winningScore);
       if (reached.length > 0) {
         return { totals, finished: true, winnerIds: reached, loserIds: [] };
       }

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SUIT_SYMBOL, type Suit } from "@/lib/games";
 import type { Player } from "@/lib/players";
-import { pirateStartCards } from "@/lib/scoring";
+import { DEFAULT_WINNING_SCORE, pirateStartCards } from "@/lib/scoring";
 import { createSession } from "@/lib/sessions";
 import { PlayerManager } from "./PlayerManager";
 
@@ -21,25 +21,32 @@ export function NewGame({
   const router = useRouter();
   // null = use the deck default (floor(52 / players)).
   const [startCards, setStartCards] = useState<number | null>(null);
+  const [winningScore, setWinningScore] = useState(DEFAULT_WINNING_SCORE);
 
   const start = (players: Player[]) => {
     const session = createSession(
       slug,
       players,
-      slug === "piratbridge" ? (startCards ?? undefined) : undefined
+      slug === "piratbridge" ? (startCards ?? undefined) : undefined,
+      slug === "500" ? winningScore : undefined
     );
     router.replace(`/games/${slug}/${session.id}`);
   };
 
   const pirateConfig = (players: Player[]) => {
-    if (slug !== "piratbridge" || players.length < 2) return null;
-    const max = pirateStartCards(players.length);
+    if (slug !== "piratbridge") return null;
+    const hasPlayers = players.length >= 2;
+    // Before two players exist the deck-default max is unknown, so assume the
+    // 2-player maximum; it re-clamps automatically as players are added.
+    const max = pirateStartCards(hasPlayers ? players.length : 2);
     const value = Math.min(startCards ?? max, max);
     return (
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-sm font-semibold text-white">Starting cards</p>
         <p className="text-xs text-white/50">
-          Fewer cards = shorter game. Max {max} for {players.length} players.
+          {hasPlayers
+            ? `Fewer cards = shorter game. Max ${max} for ${players.length} players.`
+            : "Fewer cards = shorter game. The max adjusts to the number of players."}
         </p>
         <div className="mt-3 flex items-center justify-center gap-5">
           <button
@@ -71,6 +78,44 @@ export function NewGame({
     );
   };
 
+  const fiveHundredConfig = () => {
+    if (slug !== "500") return null;
+    return (
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-baseline justify-between">
+          <p className="text-sm font-semibold text-white">Winning score</p>
+          <p className="text-2xl font-bold tabular-nums text-amber-300">
+            {winningScore}
+          </p>
+        </div>
+        <p className="text-xs text-white/50">
+          First to this score wins. Lower = shorter game.
+        </p>
+        <input
+          type="range"
+          min={100}
+          max={1000}
+          step={100}
+          value={winningScore}
+          onChange={(e) => setWinningScore(Number(e.target.value))}
+          aria-label="Winning score"
+          className="mt-3 w-full accent-amber-400"
+        />
+        <div className="mt-1 flex justify-between text-[10px] text-white/40">
+          <span>100</span>
+          <span>1000</span>
+        </div>
+      </div>
+    );
+  };
+
+  const config = (players: Player[]): ReactNode => (
+    <>
+      {pirateConfig(players)}
+      {fiveHundredConfig()}
+    </>
+  );
+
   return (
     <main className="felt flex flex-1 flex-col items-center px-5 py-10">
       <header className="mb-8 flex w-full max-w-md items-center gap-3">
@@ -87,7 +132,7 @@ export function NewGame({
         </h1>
       </header>
 
-      <PlayerManager onStart={start} belowPlayers={pirateConfig} />
+      <PlayerManager onStart={start} belowPlayers={config} />
     </main>
   );
 }

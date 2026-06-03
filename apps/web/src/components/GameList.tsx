@@ -16,7 +16,8 @@ function resultLabel(session: GameSession): string {
   const standings = computeStandings(
     session.slug,
     session.players,
-    session.rounds
+    session.rounds,
+    session.winningScore
   );
   const nameOf = (id: string) =>
     session.players.find((p) => p.id === id)?.name ?? "?";
