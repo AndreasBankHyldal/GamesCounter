@@ -166,6 +166,19 @@ export function NewRoom() {
         >
           {busy ? "Creating…" : "Create room"}
         </button>
+
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-xs text-white/40">or</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <Link
+          href="/play/solo"
+          className="rounded-2xl border border-white/15 bg-white/5 px-6 py-4 text-center text-lg font-bold text-white transition hover:bg-white/10"
+        >
+          Play solo vs bot
+        </Link>
       </section>
     </main>
   );
