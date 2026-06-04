@@ -6,3 +6,4 @@ export {
   jokerRepresents,
 } from "./melds";
 export { scoreRound } from "./scoring";
+export { enumerate as botEnumerate } from "./bot";
