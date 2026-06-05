@@ -49,6 +49,10 @@ export interface FiveHundredState {
   melds: Meld[];
   /** Cumulative scores across rounds. */
   scores: Record<PlayerID, number>;
+  /** Players who have left the game. Their turns are auto-skipped so the game
+   * keeps flowing for everyone else; cards left in hand still count against them
+   * at round end. */
+  left: Record<PlayerID, boolean>;
   /** Number of jokers in the deck (0–4), chosen at match creation. */
   jokers: number;
   /** Cumulative score that wins the game (100–1000), chosen at match creation. */

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FiveHundredClient } from "@/lib/multiplayer/client";
 import { loadIdentity, type Identity } from "@/lib/multiplayer/identity";
@@ -32,12 +31,8 @@ export function TableMount({ code }: { code: string }) {
 
   return (
     <div className="felt relative min-h-screen">
-      <Link
-        href="/"
-        className="absolute right-3 top-3 z-20 rounded-full bg-black/40 px-3 py-1 text-xs text-white/80"
-      >
-        Leave
-      </Link>
+      {/* The in-board Leave button flags the player as left (so their turns are
+          skipped) before navigating away — see FiveHundredBoard. */}
       <FiveHundredClient
         matchID={code}
         playerID={identity.playerID}
