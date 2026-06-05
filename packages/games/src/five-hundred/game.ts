@@ -54,9 +54,13 @@ export interface FiveHundredSetupData {
 // `turn.stages` config below can reference it.
 const nextRound: MoveFn<FiveHundredState> = ({ G, ctx, random, events }) => {
   if (!G.roundOver || G.finished) return INVALID_MOVE;
-  const playerIDs = Object.keys(G.hands);
-  const next = dealRound(playerIDs, (a) => random.Shuffle(a), G.jokers);
-  G.hands = next.hands;
+  // Deal only to players still in the game; those who left stay as standbys
+  // with an empty hand (no cards, score frozen).
+  const present = Object.keys(G.hands).filter((id) => !G.left[id]);
+  const next = dealRound(present, (a) => random.Shuffle(a), G.jokers);
+  G.hands = Object.fromEntries(
+    Object.keys(G.hands).map((id) => [id, next.hands[id] ?? []])
+  );
   G.stock = next.stock;
   G.faceUp = next.faceUp;
   G.melds = [];
@@ -81,6 +85,10 @@ const leaveGame: MoveFn<FiveHundredState> = ({ G, ctx, playerID, events }) => {
   const pid = playerID!;
   if (G.left[pid]) return; // already left — no-op
   G.left[pid] = true;
+  // Become a frozen standby: drop their hand so the current round's close
+  // doesn't penalise held cards, and they're dealt nothing from now on. Their
+  // cumulative score (and any melds they already placed) stays as-is.
+  G.hands[pid] = [];
   G.log.push(`${tag(pid)} left the game.`);
   if (ctx.playOrder.every((id) => G.left[id])) {
     // No one left to play — end the game.

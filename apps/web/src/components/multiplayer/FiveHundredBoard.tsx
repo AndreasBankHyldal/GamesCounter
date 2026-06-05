@@ -590,7 +590,13 @@ export function FiveHundredBoard({
           // One row per suit; separate runs in a suit are spaced apart.
           <div className="flex flex-col gap-3">
             {(["heart", "diamond", "spade", "club"] as Suit[]).map((suit) => {
-              const suitMelds = G.melds.filter((m) => m.suit === suit);
+              // Order separate runs in a suit by their starting rank, so a
+              // lower run (e.g. A-2-3) sits before a higher one (4-5-6)
+              // regardless of the order they were laid down. Each meld's cards
+              // are already arc-ordered, so cards[0].asRank is the run's start.
+              const suitMelds = G.melds
+                .filter((m) => m.suit === suit)
+                .sort((a, b) => (a.cards[0]?.asRank ?? 0) - (b.cards[0]?.asRank ?? 0));
               if (suitMelds.length === 0) return null;
               const red = SUIT_COLOR[suit] === "red";
               return (
