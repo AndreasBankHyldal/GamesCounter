@@ -40,19 +40,73 @@ type Props = BoardProps<FiveHundredState>;
 
 type AvatarInfo = { styleKey: string; seed: string };
 
-const SUIT_ORDER: Record<Suit, number> = { spade: 0, heart: 1, club: 2, diamond: 3 };
+// Canonical within-colour suit order. Suits of the same colour (♠♣ black, ♥♦
+// red) are interleaved so two same-colour suits never sit next to each other in
+// the hand — unless the hand only holds one colour, where it's unavoidable.
+const BLACK_SUITS: Suit[] = ["spade", "club"];
+const RED_SUITS: Suit[] = ["heart", "diamond"];
 
 function sortHand(cards: Card[]): Card[] {
-  return [...cards].sort((a, b) => {
-    if (a.isJoker !== b.isJoker) return a.isJoker ? 1 : -1;
-    if (a.isJoker) return 0;
-    const s = SUIT_ORDER[a.suit as Suit] - SUIT_ORDER[b.suit as Suit];
-    return s !== 0 ? s : a.rank - b.rank;
-  });
+  const jokers = cards.filter((c) => c.isJoker);
+
+  // Group real cards by suit; each suit's cards sorted by rank ascending.
+  const bySuit = new Map<Suit, Card[]>();
+  for (const c of cards) {
+    if (c.isJoker) continue;
+    const suit = c.suit as Suit;
+    const arr = bySuit.get(suit) ?? [];
+    arr.push(c);
+    bySuit.set(suit, arr);
+  }
+  for (const arr of bySuit.values()) arr.sort((a, b) => a.rank - b.rank);
+
+  // Present suit-groups, split by colour in canonical order.
+  const black = BLACK_SUITS.filter((s) => bySuit.has(s));
+  const red = RED_SUITS.filter((s) => bySuit.has(s));
+
+  // Interleave the two colours, starting with whichever has more groups, so
+  // colours alternate (B R B R) as much as the hand allows.
+  const [first, second] = black.length >= red.length ? [black, red] : [red, black];
+  const orderedSuits: Suit[] = [];
+  for (let i = 0; i < Math.max(first.length, second.length); i++) {
+    if (i < first.length) orderedSuits.push(first[i]);
+    if (i < second.length) orderedSuits.push(second[i]);
+  }
+
+  const result: Card[] = [];
+  for (const suit of orderedSuits) result.push(...(bySuit.get(suit) ?? []));
+  result.push(...jokers);
+  return result;
 }
 
 function isRed(card: Card): boolean {
   return !card.isJoker && SUIT_COLOR[card.suit as Suit] === "red";
+}
+
+/**
+ * Burst confetti outward from the winner popup box. `canvas-confetti` is loaded
+ * lazily (client-only, kept out of the initial bundle). Origin is the box's
+ * centre so the confetti appears to pop out of it.
+ */
+function celebrate(boxEl: HTMLElement | null) {
+  import("canvas-confetti")
+    .then(({ default: confetti }) => {
+      const colors = ["#fbbf24", "#f59e0b", "#ffffff", "#34d399", "#f43f5e"];
+      let origin = { x: 0.5, y: 0.4 };
+      if (boxEl) {
+        const r = boxEl.getBoundingClientRect();
+        origin = {
+          x: (r.left + r.width / 2) / window.innerWidth,
+          y: (r.top + r.height / 2) / window.innerHeight,
+        };
+      }
+      const common = { colors, zIndex: 9999, disableForReducedMotion: true };
+      // A central pop plus two side jets, for a fuller burst out of the box.
+      confetti({ ...common, particleCount: 130, spread: 100, startVelocity: 45, origin });
+      confetti({ ...common, particleCount: 60, angle: 60, spread: 70, origin: { x: Math.max(0, origin.x - 0.1), y: origin.y } });
+      confetti({ ...common, particleCount: 60, angle: 120, spread: 70, origin: { x: Math.min(1, origin.x + 0.1), y: origin.y } });
+    })
+    .catch(() => {});
 }
 
 export function FiveHundredBoard({
@@ -71,6 +125,7 @@ export function FiveHundredBoard({
   const [error, setError] = useState<string | null>(null);
   const [peek, setPeek] = useState(false);
   const [avatars, setAvatars] = useState<Record<string, AvatarInfo>>({});
+  const summaryBoxRef = useRef<HTMLDivElement>(null);
   const [soundOn, setSoundOn] = useState(true);
   const wasMyTurn = useRef(false);
 
@@ -147,11 +202,14 @@ export function FiveHundredBoard({
     if (soundOn) fn();
   };
 
-  // Victory fanfare when the game ends.
+  // Victory fanfare + confetti when the game ends (on the rising edge only).
   const isOver = Boolean(gameover);
   const wasOver = useRef(false);
   useEffect(() => {
-    if (isOver && !wasOver.current && soundOn) playWin();
+    if (isOver && !wasOver.current) {
+      if (soundOn) playWin();
+      celebrate(summaryBoxRef.current);
+    }
     wasOver.current = isOver;
   }, [isOver, soundOn]);
 
@@ -308,7 +366,10 @@ export function FiveHundredBoard({
 
       {/* Round summary / game over */}
       {paused && (
-        <div className="rounded-2xl border border-amber-300/40 bg-amber-400/10 p-4">
+        <div
+          ref={summaryBoxRef}
+          className="rounded-2xl border border-amber-300/40 bg-amber-400/10 p-4"
+        >
           <p className="text-center text-lg font-bold text-amber-200">
             {gameover
               ? `🏆 ${gameover.winner !== undefined ? nameFor(gameover.winner) : "Someone"} wins!`
