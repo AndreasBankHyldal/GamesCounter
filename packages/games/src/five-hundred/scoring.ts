@@ -10,7 +10,7 @@ import type { FiveHundredState, PlayerID, RoundResult } from "./types";
 export function scoreRound(
   G: FiveHundredState,
   playerIDs: PlayerID[],
-  closedBy: PlayerID
+  closedBy: PlayerID | null
 ): RoundResult {
   const deltas: Record<PlayerID, number> = Object.fromEntries(
     playerIDs.map((id) => [id, 0])

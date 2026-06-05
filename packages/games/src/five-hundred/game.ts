@@ -48,6 +48,34 @@ export interface FiveHundredSetupData {
   winningScore?: number;
 }
 
+/**
+ * Tally a round (melds score for their placers, cards left in hand score
+ * against their holders), record the result, and decide what comes next.
+ * Returns the seat that should start the next round, or `null` if someone
+ * reached the winning score and the game is over. Shared by `closeHand` and the
+ * deck-exhausted auto-end in `turn.onBegin`. `closedBy` is null when the round
+ * ended because no cards were left to draw (no closer).
+ */
+function settleRound(
+  G: FiveHundredState,
+  playOrder: PlayerID[],
+  closedBy: PlayerID | null
+): PlayerID | null {
+  const result = scoreRound(G, playOrder, closedBy);
+  for (const id of playOrder) G.scores[id] += result.deltas[id] ?? 0;
+  G.lastRound = result;
+  G.closedBy = closedBy;
+  if (playOrder.some((id) => G.scores[id] >= G.winningScore)) {
+    G.finished = true;
+    G.log.push(`Someone reached ${G.winningScore} — game over.`);
+    return null;
+  }
+  G.roundOver = true;
+  // Start the next round with the first present player, so a departed host
+  // can't stall the round-over screen.
+  return playOrder.find((id) => !G.left[id]) ?? "0";
+}
+
 // Host (seat 0) deals the next round; the first player rotates each round. Also
 // callable from the `spectate` stage so any present player can advance the round
 // if the rotated starter has left. Declared at module scope (hoisted) so the
@@ -167,6 +195,23 @@ export const FiveHundred: Game<
       G.meldedThisTurn = false;
       G.lastDrawnId = null;
       G.turnsThisRound += 1;
+      // Deck AND pile both empty → nobody can draw, so the round can't continue
+      // (every action requires drawing first). End it here, scoring hands as
+      // they stand with no closer, so play doesn't deadlock. Runs
+      // server-authoritatively as part of the previous player's turn-end.
+      //
+      // Use the real stock count, not `G.stock.length`: `playerView` redacts the
+      // stock to `[]` for clients, so on a client's optimistic reducer pass
+      // `stock.length` is always 0. `stockCount` carries the true count to
+      // clients and is undefined on the authoritative master (which has the real
+      // stock), so this is correct in both places.
+      const stockEmpty = (G.stockCount ?? G.stock.length) === 0;
+      if (!G.roundOver && !G.finished && stockEmpty && G.faceUp.length === 0) {
+        G.log.push("No cards left to draw — the round ends.");
+        const starter = settleRound(G, ctx.playOrder, null);
+        if (starter !== null) events.endTurn({ next: starter });
+        return;
+      }
       // A player who has left never acts, so their turn would stall the game.
       // Auto-skip it here (server-authoritative, runs as part of the previous
       // player's turn-end). We only do this during live play — at round-over we
@@ -374,24 +419,11 @@ export const FiveHundred: Game<
 
       G.hands[playerID] = [];
       G.closingCard = card; // sits face-down on the pile; others may peek
-      G.closedBy = playerID;
-      const result = scoreRound(G, ctx.playOrder, playerID);
-      for (const id of ctx.playOrder) G.scores[id] += result.deltas[id] ?? 0;
-      G.lastRound = result;
       G.log.push(`${tag(playerID)} closed round ${G.roundNumber}.`);
-
-      // Game ends once anyone reaches the winning score; otherwise pause and hand
-      // control to the host (seat 0), who starts the next round.
-      if (ctx.playOrder.some((id) => G.scores[id] >= G.winningScore)) {
-        G.finished = true;
-        G.log.push(`Someone reached ${G.winningScore} — game over.`);
-      } else {
-        G.roundOver = true;
-        // Hand control to the first present player to start the next round, so a
-        // departed host can't stall the round-over screen.
-        const starter = ctx.playOrder.find((id) => !G.left[id]) ?? "0";
-        events.endTurn({ next: starter });
-      }
+      // Score the round; ends the game if someone reached the winning score,
+      // else pauses for a present player to start the next round.
+      const starter = settleRound(G, ctx.playOrder, playerID);
+      if (starter !== null) events.endTurn({ next: starter });
     },
 
     // Host deals the next round (see the module-level definition); the first

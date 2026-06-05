@@ -35,7 +35,8 @@ export interface Meld {
 /** Per-player score change applied when a round is scored. */
 export interface RoundResult {
   roundNumber: number;
-  closedBy: PlayerID;
+  /** Who closed the round, or null if it ended because the deck ran out. */
+  closedBy: PlayerID | null;
   deltas: Record<PlayerID, number>;
 }
 
