@@ -1,5 +1,5 @@
-import type { Game } from "boardgame.io";
-import { INVALID_MOVE } from "boardgame.io/core";
+import type { Game, MoveFn } from "boardgame.io";
+import { INVALID_MOVE, Stage } from "boardgame.io/core";
 import { buildDeck, type Card } from "../cards";
 import {
   jokerRepresents,
@@ -48,6 +48,53 @@ export interface FiveHundredSetupData {
   winningScore?: number;
 }
 
+// Host (seat 0) deals the next round; the first player rotates each round. Also
+// callable from the `spectate` stage so any present player can advance the round
+// if the rotated starter has left. Declared at module scope (hoisted) so the
+// `turn.stages` config below can reference it.
+const nextRound: MoveFn<FiveHundredState> = ({ G, ctx, random, events }) => {
+  if (!G.roundOver || G.finished) return INVALID_MOVE;
+  const playerIDs = Object.keys(G.hands);
+  const next = dealRound(playerIDs, (a) => random.Shuffle(a), G.jokers);
+  G.hands = next.hands;
+  G.stock = next.stock;
+  G.faceUp = next.faceUp;
+  G.melds = [];
+  G.closingCard = null;
+  G.closedBy = null;
+  G.roundOver = false;
+  G.lastRound = null;
+  G.roundNumber += 1;
+  G.turnsThisRound = 0; // melding is closed again until everyone has played
+  G.log.push(`Round ${G.roundNumber} dealt.`);
+  // Rotate who leads: round 1 → seat 0, round 2 → seat 1, … (a left starter is
+  // auto-skipped in turn.onBegin).
+  const starter = String((G.roundNumber - 1) % ctx.numPlayers);
+  events.endTurn({ next: starter });
+};
+
+// Leave the game. Callable from any seat (it's in the `spectate` stage too), so
+// a player can quit whether or not it's their turn. Their turns are then
+// auto-skipped in turn.onBegin; cards left in hand still count against them.
+const leaveGame: MoveFn<FiveHundredState> = ({ G, ctx, playerID, events }) => {
+  if (G.finished) return INVALID_MOVE;
+  const pid = playerID!;
+  if (G.left[pid]) return; // already left — no-op
+  G.left[pid] = true;
+  G.log.push(`${tag(pid)} left the game.`);
+  if (ctx.playOrder.every((id) => G.left[id])) {
+    // No one left to play — end the game.
+    G.finished = true;
+    G.log.push("Everyone left — game over.");
+    return;
+  }
+  // If the leaver is the current player mid-round, pass the turn along now so
+  // the game doesn't wait on someone who's gone.
+  if (ctx.currentPlayer === pid && !G.roundOver) {
+    events.endTurn();
+  }
+};
+
 export const FiveHundred: Game<
   FiveHundredState,
   Record<string, unknown>,
@@ -74,6 +121,7 @@ export const FiveHundred: Game<
       hands,
       melds: [],
       scores,
+      left: {},
       jokers,
       winningScore,
       roundNumber: 1,
@@ -96,13 +144,35 @@ export const FiveHundred: Game<
   },
 
   turn: {
-    onBegin: ({ G }) => {
+    // Everyone is kept "active" every turn so the `leaveGame` (and the
+    // round-over `nextRound`) move can be sent from any seat, not just the
+    // current player. The current player sits in the null stage (top-level
+    // `moves` apply); everyone else is limited to the `spectate` stage moves.
+    activePlayers: { currentPlayer: Stage.NULL, others: "spectate" },
+    stages: {
+      spectate: { moves: { leaveGame, nextRound } },
+    },
+    onBegin: ({ G, ctx, events }) => {
       G.hasDrawn = false;
       G.tookPile = false;
       G.mustMeld = false;
       G.meldedThisTurn = false;
       G.lastDrawnId = null;
       G.turnsThisRound += 1;
+      // A player who has left never acts, so their turn would stall the game.
+      // Auto-skip it here (server-authoritative, runs as part of the previous
+      // player's turn-end). We only do this during live play — at round-over we
+      // wait for a present player to start the next round.
+      if (G.left[ctx.currentPlayer] && !G.roundOver && !G.finished) {
+        if (ctx.playOrder.every((id) => G.left[id])) {
+          // Everyone has left — nothing more to play.
+          G.finished = true;
+          G.log.push("Everyone left — game over.");
+        } else {
+          G.log.push(`${tag(ctx.currentPlayer)}'s turn was skipped (left).`);
+          events.endTurn();
+        }
+      }
     },
     // If you took the whole pile but never laid down a NEW meld, you lose 50 —
     // applied here so it fires no matter how the turn ends (discard, pass, …).
@@ -298,30 +368,20 @@ export const FiveHundred: Game<
         G.log.push(`Someone reached ${G.winningScore} — game over.`);
       } else {
         G.roundOver = true;
-        events.endTurn({ next: "0" });
+        // Hand control to the first present player to start the next round, so a
+        // departed host can't stall the round-over screen.
+        const starter = ctx.playOrder.find((id) => !G.left[id]) ?? "0";
+        events.endTurn({ next: starter });
       }
     },
 
-    // Host (seat 0) deals the next round; the first player rotates each round.
-    nextRound: ({ G, ctx, random, events }) => {
-      if (!G.roundOver || G.finished) return INVALID_MOVE;
-      const playerIDs = Object.keys(G.hands);
-      const next = dealRound(playerIDs, (a) => random.Shuffle(a), G.jokers);
-      G.hands = next.hands;
-      G.stock = next.stock;
-      G.faceUp = next.faceUp;
-      G.melds = [];
-      G.closingCard = null;
-      G.closedBy = null;
-      G.roundOver = false;
-      G.lastRound = null;
-      G.roundNumber += 1;
-      G.turnsThisRound = 0; // melding is closed again until everyone has played
-      G.log.push(`Round ${G.roundNumber} dealt.`);
-      // Rotate who leads: round 1 → seat 0, round 2 → seat 1, …
-      const starter = String((G.roundNumber - 1) % ctx.numPlayers);
-      events.endTurn({ next: starter });
-    },
+    // Host deals the next round (see the module-level definition); the first
+    // player rotates each round.
+    nextRound,
+
+    // Quit the game; remaining players keep playing (see module-level
+    // definition). Also exposed via the `spectate` stage so it works off-turn.
+    leaveGame,
   },
 
   endIf: ({ G, ctx }) => {

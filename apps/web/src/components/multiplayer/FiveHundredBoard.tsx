@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { BoardProps } from "boardgame.io/react";
 import {
   cardValue,
@@ -20,6 +21,7 @@ import {
 } from "@gamescounter/games";
 import { Avatar } from "@/components/Avatar";
 import { getRoom } from "@/lib/multiplayer/lobby";
+import { clearIdentity } from "@/lib/multiplayer/identity";
 import {
   playAdd,
   playClose,
@@ -116,9 +118,9 @@ export function FiveHundredBoard({
   playerID,
   matchID,
   matchData,
-  isActive,
   isConnected,
 }: Props) {
+  const router = useRouter();
   const me = playerID ?? "0";
   const [selected, setSelected] = useState<string[]>([]);
   const [jokerDecl, setJokerDecl] = useState<Record<string, { rank: number; suit: Suit }>>({});
@@ -186,7 +188,10 @@ export function FiveHundredBoard({
     .map((id) => myHand.find((c) => c.id === id))
     .filter((c): c is Card => Boolean(c));
   const hasJoker = selectedCards.some((c) => c.isJoker);
-  const myTurn = isActive;
+  // Every seat is kept "active" (so off-turn players can send `leaveGame`), so
+  // `isActive` is no longer a reliable "it's my turn" signal — derive it from
+  // the current player instead.
+  const myTurn = ctx.currentPlayer === me;
   const gameover = ctx.gameover as { winner?: string; scores?: Record<string, number> } | undefined;
   const paused = G.roundOver || Boolean(gameover);
 
@@ -301,6 +306,21 @@ export function FiveHundredBoard({
     sfx(playPass);
     moves.passTurn();
   }
+  function doLeave() {
+    const ok = window.confirm(
+      "Leave the game? The others keep playing without you, and your turns are skipped."
+    );
+    if (!ok) return;
+    // Flag yourself as left so the server auto-skips your turns, then go home.
+    // Works whether or not it's your turn (the move is allowed off-turn).
+    try {
+      moves.leaveGame();
+    } catch {
+      /* ignore — leaving regardless */
+    }
+    clearIdentity(matchID);
+    router.push("/");
+  }
 
   function canSwap(placed: PlacedCard): boolean {
     if (!placed.card.isJoker) return false;
@@ -327,7 +347,20 @@ export function FiveHundredBoard({
   const canDraw = myTurn && !G.hasDrawn && !paused;
 
   return (
-    <div className="felt flex min-h-screen flex-col gap-4 px-4 pb-8 pt-14 text-white">
+    <div className="felt relative flex min-h-screen flex-col gap-4 px-4 pb-8 pt-14 text-white">
+      {/* Leave the game — flags you as left so the server skips your turns and
+          the others keep playing. (Solo play has its own exit link in
+          SoloMount, where there's no one to unblock.) */}
+      {matchID !== "solo" && (
+        <button
+          type="button"
+          onClick={doLeave}
+          className="absolute right-3 top-3 z-20 rounded-full bg-black/40 px-3 py-1 text-xs text-white/80 hover:bg-black/60"
+        >
+          Leave
+        </button>
+      )}
+
       {/* Status bar (pushed below the Leave button) */}
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
@@ -420,7 +453,9 @@ export function FiveHundredBoard({
 
           {!gameover && (
             <div className="mt-4 text-center">
-              {myTurn ? (
+              {/* The rotated starter advances the round; if they've left, any
+                  present player can step in (nextRound is allowed off-turn). */}
+              {!G.left[me] && (myTurn || G.left[ctx.currentPlayer]) ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -454,7 +489,14 @@ export function FiveHundredBoard({
           >
             <AvatarChip a={avatars[pid]} size={32} />
             <div className="flex flex-col">
-              <span className="text-sm font-semibold">{nameFor(pid)}</span>
+              <span className="text-sm font-semibold">
+                {nameFor(pid)}
+                {G.left[pid] && (
+                  <span className="ml-1 rounded bg-white/15 px-1 text-[10px] font-normal text-white/60">
+                    left
+                  </span>
+                )}
+              </span>
               <span className="text-xs text-white/60">
                 {handCount(pid)} cards · {G.scores[pid] ?? 0} pts
               </span>
