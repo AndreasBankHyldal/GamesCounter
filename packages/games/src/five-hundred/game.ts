@@ -120,22 +120,33 @@ export const FiveHundred: Game<
 
   moves: {
     // ---- Draw phase (exactly one of these per turn) ----
-    drawFromStock: ({ G, playerID, random }) => {
-      if (G.roundOver || G.finished) return INVALID_MOVE;
-      if (G.hasDrawn) return INVALID_MOVE;
-      if (G.stock.length === 0) {
-        // Stock empty: reshuffle the face-up pile (keeping its top) into a new
-        // face-down stock.
-        if (G.faceUp.length <= 1) return INVALID_MOVE;
-        const top = G.faceUp[G.faceUp.length - 1];
-        G.stock = random.Shuffle(G.faceUp.slice(0, -1));
-        G.faceUp = [top];
-      }
-      const card = G.stock.pop()!;
-      G.hands[playerID].push(card);
-      G.hasDrawn = true;
-      G.lastDrawnId = card.id;
-      G.log.push(`${tag(playerID)} drew from the deck.`);
+    // `client: false` — run only on the (authoritative) master, never as an
+    // optimistic client prediction. The stock is secret (redacted to `[]` in
+    // playerView), so on the client `G.stock.length === 0` is always true and
+    // this move would wrongly hit the reshuffle/INVALID_MOVE branch (logging
+    // `ERROR: invalid move: drawFromStock` to the console — most visibly on the
+    // first draw of a round and right after someone empties the pile with
+    // takeFaceUpPile). The master has the real stock, so it draws correctly and
+    // syncs the result back.
+    drawFromStock: {
+      client: false,
+      move: ({ G, playerID, random }) => {
+        if (G.roundOver || G.finished) return INVALID_MOVE;
+        if (G.hasDrawn) return INVALID_MOVE;
+        if (G.stock.length === 0) {
+          // Stock empty: reshuffle the face-up pile (keeping its top) into a new
+          // face-down stock.
+          if (G.faceUp.length <= 1) return INVALID_MOVE;
+          const top = G.faceUp[G.faceUp.length - 1];
+          G.stock = random.Shuffle(G.faceUp.slice(0, -1));
+          G.faceUp = [top];
+        }
+        const card = G.stock.pop()!;
+        G.hands[playerID].push(card);
+        G.hasDrawn = true;
+        G.lastDrawnId = card.id;
+        G.log.push(`${tag(playerID)} drew from the deck.`);
+      },
     },
 
     drawFromFaceUp: ({ G, playerID }) => {
