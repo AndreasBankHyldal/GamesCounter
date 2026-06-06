@@ -29,7 +29,23 @@ export function WaitingRoom({ code }: { code: string }) {
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const navigated = useRef(false);
+
+  // Copy a shareable link to this room (full URL including the code) so the
+  // host can send it to friends, e.g. https://games-counter.vercel.app/play/ABC123
+  const copyInviteLink = useCallback(async () => {
+    const url = `${window.location.origin}/play/${code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (rare) — fall back to a prompt so the link is still
+      // selectable/copyable by hand.
+      window.prompt("Copy this invite link:", url);
+    }
+  }, [code]);
 
   // Load any saved identity for this room after mount.
   useEffect(() => {
@@ -171,6 +187,13 @@ export function WaitingRoom({ code }: { code: string }) {
           <p className="text-xs uppercase tracking-widest text-white/50">Room code</p>
           <p className="my-2 text-4xl font-bold tracking-[0.3em] text-amber-300">{code}</p>
           <p className="text-sm text-white/60">Share this code with your friends.</p>
+          <button
+            type="button"
+            onClick={copyInviteLink}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/25"
+          >
+            {copied ? "✓ Link copied!" : "🔗 Copy invite link"}
+          </button>
         </div>
 
         <h2 className="mb-3 mt-6 text-sm font-semibold uppercase tracking-widest text-white/50">
