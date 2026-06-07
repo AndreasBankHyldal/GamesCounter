@@ -28,8 +28,9 @@ dist/
 # IDE
 .idea/
 
-# local claude settings
+# local claude settings + assistant memory
 .claude/settings.local.json
+.claude/projects/
 
 # debug
 npm-debug.log*
