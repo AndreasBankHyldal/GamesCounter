@@ -164,3 +164,16 @@ export function validateExtend(
 export function jokerRepresents(placed: PlacedCard): { suit: Suit; rank: number } {
   return { suit: placed.asSuit, rank: placed.asRank };
 }
+
+/**
+ * Check whether two same-suit melds can be joined into one contiguous run
+ * (e.g. 2-3-4 + 6-7-8 become 2-3-4-5-6-7-8 once a 5 bridges them). Returns
+ * the merged, arc-ordered card list if they connect, or null if they don't.
+ */
+export function tryMergeMelds(a: Meld, b: Meld): PlacedCard[] | null {
+  if (a.suit !== b.suit) return null;
+  const combined = [...a.cards, ...b.cards];
+  const start = circularStart(combined.map((c) => c.asRank));
+  if (start === null) return null;
+  return orderByArc(combined, start);
+}
