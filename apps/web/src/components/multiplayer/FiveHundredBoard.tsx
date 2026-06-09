@@ -347,7 +347,7 @@ export function FiveHundredBoard({
   const canDraw = myTurn && !G.hasDrawn && !paused;
 
   return (
-    <div className="felt relative flex min-h-screen flex-col gap-4 px-4 pb-8 pt-14 text-white">
+    <div className="felt relative flex min-h-screen flex-col gap-4 px-4 pb-8 pt-3 text-white">
       {/* Leave the game — flags you as left so the server skips your turns and
           the others keep playing. (Solo play has its own exit link in
           SoloMount, where there's no one to unblock.) */}
@@ -513,7 +513,7 @@ export function FiveHundredBoard({
       {/* Piles */}
       <div className="flex items-stretch justify-center gap-6 rounded-2xl bg-black/15 p-4">
         <div className="flex flex-col items-center gap-2">
-          <CardBack large label={String(G.stockCount ?? G.stock.length)} />
+          <CardBack medium label={String(G.stockCount ?? G.stock.length)} />
           <button
             type="button"
             disabled={!canDraw}
@@ -529,9 +529,9 @@ export function FiveHundredBoard({
 
         <div className="flex flex-col items-center gap-2">
           {faceUpTop ? (
-            <CardFace card={faceUpTop} large />
+            <CardFace card={faceUpTop} medium />
           ) : (
-            <div className="flex h-28 w-20 items-center justify-center rounded-lg border-2 border-dashed border-white/25 text-xs text-white/40">
+            <div className="flex h-20 w-14 items-center justify-center rounded-lg border-2 border-dashed border-white/25 text-xs text-white/40">
               empty
             </div>
           )}
@@ -575,7 +575,7 @@ export function FiveHundredBoard({
 
       {G.mustMeld && myTurn && !paused && (
         <p className="rounded-lg bg-rose-500/20 px-3 py-2 text-center text-xs text-rose-100">
-          You took the pile — lay down a new meld (3+ cards) this turn, or lose 50 points.
+          You took the pile — lay down a meld or add cards to the table this turn, or lose 50 points.
         </p>
       )}
 
@@ -830,17 +830,19 @@ function AvatarChip({ a, size = 32 }: { a?: AvatarInfo; size?: number }) {
 function CardFace({
   card,
   large,
+  medium,
   selectable,
   selected,
   onClick,
 }: {
   card: Card;
   large?: boolean;
+  medium?: boolean;
   selectable?: boolean;
   selected?: boolean;
   onClick?: () => void;
 }) {
-  const size = large ? "h-28 w-20" : "h-16 w-11";
+  const size = large ? "h-28 w-20" : medium ? "h-20 w-14" : "h-16 w-11";
   const Tag = selectable ? "button" : "div";
   const ring = selected ? "-translate-y-2 ring-2 ring-amber-400" : "";
 
@@ -852,13 +854,13 @@ function CardFace({
           selectable ? "transition hover:-translate-y-1" : ""
         }`}
       >
-        <span className={`font-extrabold tracking-wide ${large ? "text-sm" : "text-[10px]"}`}>
+        <span className={`font-extrabold tracking-wide ${large ? "text-sm" : medium ? "text-xs" : "text-[10px]"}`}>
           JOKER
         </span>
-        <span className={`leading-none ${large ? "text-xl" : "text-sm"}`} aria-hidden>
+        <span className={`leading-none ${large ? "text-xl" : medium ? "text-base" : "text-sm"}`} aria-hidden>
           ♠♥♦♣
         </span>
-        <span className={`uppercase tracking-widest opacity-80 ${large ? "text-[10px]" : "text-[7px]"}`}>
+        <span className={`uppercase tracking-widest opacity-80 ${large || medium ? "text-[10px]" : "text-[7px]"}`}>
           wild
         </span>
       </Tag>
@@ -871,7 +873,7 @@ function CardFace({
     <Tag
       {...(selectable ? { type: "button", onClick } : {})}
       className={`flex ${size} shrink-0 items-center justify-center rounded-lg bg-white font-bold shadow ${
-        large ? "text-3xl" : "text-lg"
+        large ? "text-3xl" : medium ? "text-2xl" : "text-lg"
       } ${color} ${ring} ${selectable ? "transition hover:-translate-y-1" : ""}`}
     >
       {label}
@@ -923,8 +925,8 @@ function JokerOnTable({ placed }: { placed: PlacedCard }) {
   );
 }
 
-function CardBack({ large, label }: { large?: boolean; label?: string }) {
-  const size = large ? "h-28 w-20 text-lg" : "h-9 w-6 text-xs";
+function CardBack({ large, medium, label }: { large?: boolean; medium?: boolean; label?: string }) {
+  const size = large ? "h-28 w-20 text-lg" : medium ? "h-20 w-14 text-base" : "h-9 w-6 text-xs";
   return (
     <div
       className={`flex ${size} items-center justify-center rounded-lg border border-white/30 bg-gradient-to-br from-rose-700 to-rose-900 font-bold text-white/90 shadow`}

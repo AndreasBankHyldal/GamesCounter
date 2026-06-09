@@ -346,8 +346,10 @@ export const FiveHundred: Game<
 
       meld.cards = res.cards;
       G.hands[playerID] = hand.filter((c) => !cardIds.includes(c.id));
-      // NB: extending does NOT satisfy the "take the pile → lay a meld"
-      // obligation; only a brand-new meld (playMeld) clears `mustMeld`.
+      // Adding to an existing run satisfies the "take the pile → lay cards"
+      // obligation the same as opening a brand-new meld.
+      G.mustMeld = false;
+      G.meldedThisTurn = true;
       G.log.push(`${tag(playerID)} added cards to the table.`);
     },
 
