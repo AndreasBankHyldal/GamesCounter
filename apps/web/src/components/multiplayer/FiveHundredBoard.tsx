@@ -575,7 +575,7 @@ export function FiveHundredBoard({
 
       {G.mustMeld && myTurn && !paused && (
         <p className="rounded-lg bg-rose-500/20 px-3 py-2 text-center text-xs text-rose-100">
-          You took the pile — lay down a new meld (3+ cards) this turn, or lose 50 points.
+          You took the pile — lay down a meld or add cards to the table this turn, or lose 50 points.
         </p>
       )}
 
