@@ -20,8 +20,8 @@ import {
   type Suit,
 } from "@gamescounter/games";
 import { Avatar } from "@/components/Avatar";
-import { getRoom } from "@/lib/multiplayer/lobby";
-import { clearIdentity } from "@/lib/multiplayer/identity";
+import { createRoom, getRoom, joinRoom, updatePlayerData, type RoomInfo } from "@/lib/multiplayer/lobby";
+import { clearIdentity, loadIdentity, saveIdentity } from "@/lib/multiplayer/identity";
 import {
   playAdd,
   playClose,
@@ -217,6 +217,109 @@ export function FiveHundredBoard({
     }
     wasOver.current = isOver;
   }, [isOver, soundOn]);
+
+  // ---- Rematch ----
+  const [rematchRoom, setRematchRoom] = useState<RoomInfo | null>(null);
+  const [rematchLoading, setRematchLoading] = useState(false);
+  const hasNavigatedRematch = useRef(false);
+  const isAdmin = me === "0";
+
+  // Poll room metadata for rematch coordination once the game is over.
+  useEffect(() => {
+    if (!isOver || matchID === "solo") return;
+    const poll = () => getRoom(matchID).then(setRematchRoom).catch(() => {});
+    poll();
+    const t = setInterval(poll, 2000);
+    return () => clearInterval(t);
+  }, [isOver, matchID]);
+
+  const seat0 = rematchRoom?.players.find((p) => p.id === 0);
+  const rematchPending = seat0?.data?.rematchPending === true;
+  const rematchCode = seat0?.data?.rematchCode as string | undefined;
+  const myRematchData = rematchRoom?.players.find((p) => String(p.id) === me)?.data;
+  const iHaveAccepted = isAdmin || myRematchData?.rematchAccepted === true;
+  const acceptedCount = rematchRoom
+    ? rematchRoom.players.filter((p) => p.id === 0 || p.data?.rematchAccepted).length
+    : 1;
+
+  // Non-admin: when admin has set rematchCode and I accepted, auto-join + navigate.
+  useEffect(() => {
+    if (!rematchCode || isAdmin || !iHaveAccepted || hasNavigatedRematch.current) return;
+    hasNavigatedRematch.current = true;
+    const identity = loadIdentity(matchID);
+    if (!identity) return;
+    const avatar =
+      identity.avatarStyle && identity.avatarSeed
+        ? { styleKey: identity.avatarStyle, seed: identity.avatarSeed }
+        : undefined;
+    joinRoom(rematchCode, identity.name, avatar)
+      .then(({ playerID: newPID, playerCredentials: newCreds }) => {
+        saveIdentity(rematchCode, {
+          playerID: newPID,
+          credentials: newCreds,
+          name: identity.name,
+          avatarStyle: identity.avatarStyle,
+          avatarSeed: identity.avatarSeed,
+        });
+        router.push(`/play/${rematchCode}`);
+      })
+      .catch(() => {});
+  }, [rematchCode, isAdmin, iHaveAccepted, matchID]);
+
+  async function proposeRematch() {
+    const identity = loadIdentity(matchID);
+    if (!identity) return;
+    await updatePlayerData(matchID, me, identity.credentials, {
+      ...(seat0?.data ?? {}),
+      rematchPending: true,
+    });
+  }
+
+  async function acceptRematch() {
+    const identity = loadIdentity(matchID);
+    if (!identity) return;
+    await updatePlayerData(matchID, me, identity.credentials, {
+      ...(myRematchData ?? {}),
+      rematchAccepted: true,
+    });
+  }
+
+  async function startRematch() {
+    const identity = loadIdentity(matchID);
+    if (!identity) return;
+    setRematchLoading(true);
+    try {
+      const newCode = await createRoom(acceptedCount, {
+        jokers: G.jokers,
+        winningScore: G.winningScore,
+      });
+      const avatar =
+        identity.avatarStyle && identity.avatarSeed
+          ? { styleKey: identity.avatarStyle, seed: identity.avatarSeed }
+          : undefined;
+      const { playerID: newPID, playerCredentials: newCreds } = await joinRoom(
+        newCode,
+        identity.name,
+        avatar,
+        "0"
+      );
+      saveIdentity(newCode, {
+        playerID: newPID,
+        credentials: newCreds,
+        name: identity.name,
+        avatarStyle: identity.avatarStyle,
+        avatarSeed: identity.avatarSeed,
+      });
+      await updatePlayerData(matchID, me, identity.credentials, {
+        ...(seat0?.data ?? {}),
+        rematchCode: newCode,
+      });
+      hasNavigatedRematch.current = true;
+      router.push(`/play/${newCode}`);
+    } catch {
+      setRematchLoading(false);
+    }
+  }
 
   // Keep the selection in sync with your hand: when cards leave (a successful
   // meld/discard) they drop out of the selection automatically; if a move is
@@ -470,6 +573,75 @@ export function FiveHundredBoard({
                 <p className="text-sm text-white/60">
                   Waiting for the game leader to start the next round…
                 </p>
+              )}
+            </div>
+          )}
+
+          {/* Rematch — only for real multiplayer games, not solo */}
+          {gameover && matchID !== "solo" && (
+            <div className="mt-4 flex flex-col items-center gap-3">
+              {isAdmin ? (
+                <>
+                  {!rematchPending ? (
+                    <button
+                      type="button"
+                      onClick={proposeRematch}
+                      className="game-card rounded-xl px-5 py-3 text-sm font-bold text-white"
+                    >
+                      🔁 Propose rematch
+                    </button>
+                  ) : !rematchCode ? (
+                    <>
+                      <div className="flex flex-wrap justify-center gap-1.5">
+                        {rematchRoom?.players
+                          .filter((p) => p.id !== 0)
+                          .map((p) => (
+                            <span
+                              key={p.id}
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                p.data?.rematchAccepted
+                                  ? "bg-emerald-500/30 text-emerald-200"
+                                  : "bg-white/10 text-white/40"
+                              }`}
+                            >
+                              {p.name ?? `Player ${p.id + 1}`}{" "}
+                              {p.data?.rematchAccepted ? "✓" : "…"}
+                            </span>
+                          ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={startRematch}
+                        disabled={rematchLoading || acceptedCount < 1}
+                        className="game-card rounded-xl px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        {rematchLoading
+                          ? "Starting…"
+                          : `Start rematch (${acceptedCount} player${acceptedCount !== 1 ? "s" : ""})`}
+                      </button>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {rematchPending && !iHaveAccepted && (
+                    <button
+                      type="button"
+                      onClick={acceptRematch}
+                      className="game-card rounded-xl px-5 py-3 text-sm font-bold text-white"
+                    >
+                      ✓ Accept rematch
+                    </button>
+                  )}
+                  {iHaveAccepted && (
+                    <p className="text-sm text-white/60">
+                      {rematchCode ? "Joining new game…" : "Waiting for host to start…"}
+                    </p>
+                  )}
+                  {!rematchPending && (
+                    <p className="text-sm text-white/40">Waiting for host to propose a rematch…</p>
+                  )}
+                </>
               )}
             </div>
           )}
