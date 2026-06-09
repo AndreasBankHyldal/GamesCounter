@@ -4,6 +4,7 @@ export {
   validateNewMeld,
   validateExtend,
   jokerRepresents,
+  tryMergeMelds,
 } from "./melds";
 export { scoreRound } from "./scoring";
 export { enumerate as botEnumerate } from "./bot";

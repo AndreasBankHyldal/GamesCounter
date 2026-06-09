@@ -3,6 +3,7 @@ import { INVALID_MOVE, Stage } from "boardgame.io/core";
 import { buildDeck, type Card } from "../cards";
 import {
   jokerRepresents,
+  tryMergeMelds,
   validateExtend,
   validateNewMeld,
 } from "./melds";
@@ -32,6 +33,31 @@ function dealRound(playerIDs: PlayerID[], shuffle: Shuffle, jokers: number) {
 /** Player reference token; the client swaps `@@<id>@@` for the display name. */
 function tag(playerID: PlayerID) {
   return `@@${playerID}@@`;
+}
+
+/**
+ * After a meld is created or extended, check whether it now forms a contiguous
+ * arc with any adjacent same-suit meld on the table and, if so, absorb them.
+ * Repeats until no further merges are possible (handles the case where one card
+ * bridges two existing runs simultaneously). Mutates G.melds in place.
+ */
+function mergeMelds(G: FiveHundredState, targetId: string): void {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const target = G.melds.find((m) => m.id === targetId);
+    if (!target) break;
+    for (const other of G.melds) {
+      if (other.id === targetId) continue;
+      const merged = tryMergeMelds(target, other);
+      if (merged !== null) {
+        target.cards = merged;
+        G.melds = G.melds.filter((m) => m.id !== other.id);
+        changed = true;
+        break; // restart — G.melds has changed
+      }
+    }
+  }
 }
 
 /**
@@ -321,6 +347,7 @@ export const FiveHundred: Game<
       G.melds.push(res.meld);
       G.mustMeld = false;
       G.meldedThisTurn = true;
+      mergeMelds(G, res.meld.id);
       G.log.push(`${tag(playerID)} laid down a meld.`);
     },
 
@@ -350,6 +377,7 @@ export const FiveHundred: Game<
       // obligation the same as opening a brand-new meld.
       G.mustMeld = false;
       G.meldedThisTurn = true;
+      mergeMelds(G, meldId);
       G.log.push(`${tag(playerID)} added cards to the table.`);
     },
 
