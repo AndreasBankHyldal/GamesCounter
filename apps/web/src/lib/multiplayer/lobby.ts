@@ -13,6 +13,12 @@ export interface PlayerData {
   started?: boolean;
   avatarStyle?: string;
   avatarSeed?: string;
+  /** Set on seat 0 when admin proposes a rematch. */
+  rematchPending?: boolean;
+  /** Set on each player when they accept the rematch invite. */
+  rematchAccepted?: boolean;
+  /** Set on seat 0 once admin has created the new room — the new room code. */
+  rematchCode?: string;
 }
 
 export interface RoomPlayer {
@@ -73,6 +79,16 @@ export async function getRoom(code: string): Promise<RoomInfo> {
     players: match.players as RoomPlayer[],
     gameover: match.gameover,
   };
+}
+
+/** Update arbitrary fields on a player's metadata without wiping existing data. */
+export async function updatePlayerData(
+  code: string,
+  playerID: string,
+  credentials: string,
+  data: PlayerData
+): Promise<void> {
+  await lobby.updatePlayer(GAME_NAME, code, { playerID, credentials, data });
 }
 
 export async function leaveRoom(
