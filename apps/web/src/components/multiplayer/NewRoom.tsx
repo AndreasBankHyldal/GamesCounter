@@ -26,9 +26,15 @@ const GAMES = [
   },
 ];
 
-export function NewRoom() {
+function isGameId(value: string | undefined): value is GameId {
+  return Object.values(GAME_IDS).includes(value as GameId);
+}
+
+export function NewRoom({ initialGameId }: { initialGameId?: string }) {
   const router = useRouter();
-  const [gameId, setGameId] = useState<GameId>(GAME_IDS.fiveHundred);
+  const [gameId, setGameId] = useState<GameId>(
+    isGameId(initialGameId) ? initialGameId : GAME_IDS.fiveHundred
+  );
   const game = GAMES.find((g) => g.id === gameId) ?? GAMES[0];
 
   const [name, setName] = useState("");

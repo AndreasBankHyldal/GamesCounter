@@ -5,7 +5,13 @@ export const metadata = {
   title: "Play online · Games Counter",
 };
 
-export default function PlayHome() {
+export default async function PlayHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ game?: string }>;
+}) {
+  const { game } = await searchParams;
+  const newRoomHref = game ? `/play/new?game=${game}` : "/play/new";
   return (
     <main className="felt flex flex-1 flex-col items-center px-5 py-12">
       <header className="mb-10 flex w-full max-w-md items-center gap-3">
@@ -27,7 +33,7 @@ export default function PlayHome() {
             Host a game
           </h2>
           <Link
-            href="/play/new"
+            href={newRoomHref}
             className="game-card flex items-center justify-between rounded-2xl px-6 py-5 text-white"
           >
             <span className="flex flex-col">
