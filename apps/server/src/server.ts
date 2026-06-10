@@ -7,6 +7,16 @@ import { PostgresStore } from "./db";
 
 const PORT = Number(process.env.PORT ?? 8000);
 
+// Last-resort guards: a single bad socket sync (e.g. a client connected under
+// the wrong game name) must not crash the process and kick every table on the
+// server into a restart loop. Log it and keep serving.
+process.on("uncaughtException", (err) => {
+  console.error("[server] uncaught exception:", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] unhandled rejection:", reason);
+});
+
 // Allowed browser origins for the game + lobby API. Localhost is always allowed
 // for development; the deployed web origin comes from CLIENT_ORIGIN. Vercel
 // preview URLs (*.vercel.app) are allowed via regex so previews work too.

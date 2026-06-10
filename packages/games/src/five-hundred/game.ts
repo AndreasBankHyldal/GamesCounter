@@ -478,6 +478,9 @@ export const FiveHundred: Game<
   // Hide secret state from each client: other players' hands and the face-down
   // stock contents. Counts are exposed so the UI can render card backs.
   playerView: ({ G, playerID }) => {
+    // A client connected under the wrong game name routes another game's
+    // state through here; an empty view beats crashing the whole server.
+    if (!G?.stock || !G?.hands) return {} as FiveHundredState;
     const hands: Record<PlayerID, Card[]> = {};
     const handCounts: Record<PlayerID, number> = {};
     for (const id of Object.keys(G.hands)) {
