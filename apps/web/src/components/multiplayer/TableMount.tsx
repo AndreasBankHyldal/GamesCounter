@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiveHundredClient, PiratbridgeClient } from "@/lib/multiplayer/client";
-import { loadIdentity, saveIdentity, type Identity } from "@/lib/multiplayer/identity";
+import { loadIdentity, type Identity } from "@/lib/multiplayer/identity";
 import { GAME_IDS } from "@/lib/multiplayer/config";
-import { getRoom } from "@/lib/multiplayer/lobby";
 
 export function TableMount({ code }: { code: string }) {
   const router = useRouter();
@@ -18,32 +17,8 @@ export function TableMount({ code }: { code: string }) {
       router.replace(`/play/${code}`);
       return;
     }
-    // Verify the game type against the server before mounting a client.
-    // Connecting the wrong game's client to a match makes the server apply
-    // the wrong playerView to its state — never trust the stored gameId alone.
-    let cancelled = false;
-    getRoom(code, id.gameId)
-      .then((room) => {
-        if (cancelled) return;
-        if (room.gameId !== id.gameId) {
-          const healed = { ...id, gameId: room.gameId };
-          saveIdentity(code, healed);
-          setIdentity(healed);
-        } else {
-          setIdentity(id);
-        }
-        setReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Server unreachable — fall back to the stored identity so reconnects
-        // during a server blip still work.
-        setIdentity(id);
-        setReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
+    setIdentity(id);
+    setReady(true);
   }, [code, router]);
 
   if (!ready || !identity) {

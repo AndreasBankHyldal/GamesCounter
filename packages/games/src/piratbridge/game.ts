@@ -251,9 +251,6 @@ export const Piratbridge: Game<
   },
 
   playerView: ({ G, playerID }) => {
-    // A client connected under the wrong game name routes another game's
-    // state through here; an empty view beats crashing the whole server.
-    if (!G?.hands || !G?.bets) return {} as PiratbridgeState;
     const isOpenFinal =
       G.openFinalRound && G.cardsThisRound === 1 && G.phase !== "betting";
 
