@@ -10,6 +10,7 @@ export type {
   PiratbridgeState,
   PiratbridgeSetupData,
   TrickCard,
+  CompletedTrick,
   GamePhase,
 } from "./piratbridge/types";
 

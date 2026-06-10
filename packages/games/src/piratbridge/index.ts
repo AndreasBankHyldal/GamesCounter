@@ -4,6 +4,7 @@ export type {
   PiratbridgeState,
   RoundResult,
   TrickCard,
+  CompletedTrick,
   GamePhase,
 } from "./types";
 export { scoreRound } from "./scoring";
