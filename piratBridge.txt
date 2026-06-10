@@ -1,0 +1,30 @@
+Rules for piratbridge:
+
+The game with dealing ALL the cards available to the players, so if 4 players 13 cards each and if 3 people then 17 cards each.
+If there is any spare cards these will just be layed to the side. 
+After each round, one less card is dealed, meaning that in cound two for 4 players will be 12 cards and for 3 16 cards, and so on...
+
+Before the actual rounds start, each player has to "bet" on the amount of sets they believe they can get during that round.
+This is decided by the player while looking at the cards they have received.
+When every player is ready they state how many sets they will bet on receiving this round, this should be visualized by matched, each match is a set. 
+Each player gives their bet at the same time, and will be showed by the matches infront of each player. Now the game can oficially start.
+
+The person next to the person who dealed the cards (this is also changing each round, and should be showed visually next to the persons player card) is the one that starts. 
+He lays one card on the table, the next person then has to lay down a card that matches that face. If the next player dont have any card of that face, then they may lay down any face.
+each round is one card layed per player, you win a round by laying down the highest card of the face that the first person layed. Ace is the highest and 2 is the lowest.
+For instance if the first person lays a 5 of hearts, the second 4 of hearts and the third 10 of hearts, then the third person who layed 10 of hearts wins the cound and takes that set. 
+The player who gets the set, is also the person who starts the next round. 
+In all rounds the Trump card is spade, this means that if you dont have any card of the face layed down by the first person, then you may lay down a spade, and this will automatically win the set, if there is not another higher spade layed on the table, before or after. 
+ 
+Before you start the game there should be two settings to costumize, there should be a question in the amount of starting cards you will play with, this is to be able to take shorter matches. 
+There should also be an option to play with open or closed card in the final round.
+This means that if you pick open card, then when the game gets to the final round, then you cannot see your own card but you can see everyone elses card. 
+And if you pick closed card, then it is like the other rounds where you can only see your own.
+ 
+points: 
+After all cards in a round has been played, then it is time to give points. 
+If you guess correct you receive 10 points + the amount of sets you bettet that you would receive.
+If you guess wrong, you receive minus the amount of sets you bettet. 
+So for instance if you bet to get 5 sets, and actually get that then you receive 15 points, but if you miss and only get 3 sets, then you get minus 5 points (you can get negative score) 
+
+It should be possible to always see the amount of sets bettet and the amount of sets received in each round, for other players to follow along. 
