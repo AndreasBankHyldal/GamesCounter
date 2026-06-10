@@ -78,9 +78,16 @@ function CardFace({
   const size = small ? "h-12 w-8 text-xs" : "h-16 w-11 text-sm";
 
   if (faceDown) {
+    // Must stay clickable: in the open final round you play your own card
+    // without seeing it, so this face-down card is the only way to move.
     return (
-      <div
-        className={`${size} rounded-lg border-2 border-white/20 bg-blue-900 shadow`}
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled || !onClick}
+        className={`${size} rounded-lg border-2 border-white/20 bg-blue-900 shadow transition
+          ${onClick && !disabled ? "cursor-pointer ring-2 ring-amber-400/70 hover:scale-105 active:scale-95" : "cursor-default"}
+        `}
         aria-label="Face-down card"
       />
     );
