@@ -32,9 +32,8 @@ function isGameId(value: string | undefined): value is GameId {
 
 export function NewRoom({ initialGameId }: { initialGameId?: string }) {
   const router = useRouter();
-  const [gameId, setGameId] = useState<GameId>(
-    isGameId(initialGameId) ? initialGameId : GAME_IDS.fiveHundred
-  );
+  // The game is chosen on the home page; no in-page switcher.
+  const gameId: GameId = isGameId(initialGameId) ? initialGameId : GAME_IDS.fiveHundred;
   const game = GAMES.find((g) => g.id === gameId) ?? GAMES[0];
 
   const [name, setName] = useState("");
@@ -100,24 +99,6 @@ export function NewRoom({ initialGameId }: { initialGameId?: string }) {
       </header>
 
       <section className="flex w-full max-w-md flex-col gap-6">
-        {/* Game selector */}
-        <div className="flex gap-2 rounded-2xl border border-white/10 bg-white/5 p-2">
-          {GAMES.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => setGameId(g.id)}
-              className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold transition ${
-                gameId === g.id
-                  ? "bg-amber-400 text-black"
-                  : "text-white hover:bg-white/10"
-              }`}
-            >
-              {g.name}
-            </button>
-          ))}
-        </div>
-
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <p className="text-xl font-bold text-white">{game.name}</p>
           <p className="text-sm text-white/60">{game.tagline}</p>
