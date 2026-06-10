@@ -18,6 +18,43 @@ import { GAME_IDS } from "@/lib/multiplayer/config";
 
 type Props = BoardProps<PiratbridgeState>;
 
+// Canonical within-colour suit order, as in the 500 board. Suits of the same
+// colour (♠♣ black, ♥♦ red) are interleaved so two same-colour suits never sit
+// next to each other in the hand — unless the hand only holds one colour,
+// where it's unavoidable.
+const BLACK_SUITS: Suit[] = ["spade", "club"];
+const RED_SUITS: Suit[] = ["heart", "diamond"];
+
+function sortHand(cards: Card[]): Card[] {
+  // Group cards by suit; each suit's cards sorted by rank ascending (ace high).
+  const bySuit = new Map<Suit, Card[]>();
+  for (const c of cards) {
+    const suit = c.suit as Suit;
+    const arr = bySuit.get(suit) ?? [];
+    arr.push(c);
+    bySuit.set(suit, arr);
+  }
+  const effectiveRank = (c: Card) => (c.rank === 1 ? 14 : c.rank);
+  for (const arr of bySuit.values()) arr.sort((a, b) => effectiveRank(a) - effectiveRank(b));
+
+  // Present suit-groups, split by colour in canonical order.
+  const black = BLACK_SUITS.filter((s) => bySuit.has(s));
+  const red = RED_SUITS.filter((s) => bySuit.has(s));
+
+  // Interleave the two colours, starting with whichever has more groups, so
+  // colours alternate (B R B R) as much as the hand allows.
+  const [first, second] = black.length >= red.length ? [black, red] : [red, black];
+  const orderedSuits: Suit[] = [];
+  for (let i = 0; i < Math.max(first.length, second.length); i++) {
+    if (i < first.length) orderedSuits.push(first[i]);
+    if (i < second.length) orderedSuits.push(second[i]);
+  }
+
+  const result: Card[] = [];
+  for (const suit of orderedSuits) result.push(...(bySuit.get(suit) ?? []));
+  return result;
+}
+
 // ─── Card rendering ───────────────────────────────────────────────────────────
 
 function CardFace({
@@ -263,6 +300,13 @@ export function PiratbridgeBoard({
 
   const isOpenFinal = G.openFinalRound && G.cardsThisRound === 1;
 
+  // Sum of everyone's bets vs the tricks on offer — only meaningful (and only
+  // shown) once bets are revealed; before that opponents' bets read -1.
+  const totalBid = ctx.playOrder.reduce((sum, pid) => {
+    const bet = G.bets[pid];
+    return sum + (bet !== null && bet >= 0 ? bet : 0);
+  }, 0);
+
   const myIndex = ctx.playOrder.indexOf(myID);
   const numPlayers = ctx.numPlayers;
 
@@ -275,18 +319,9 @@ export function PiratbridgeBoard({
     return !hasLeadSuit;
   }
 
-  // Sort hand: by suit (spades first as trump), then by rank
-  const sortedHand = useMemo(() => {
-    const hand = G.hands[myID] ?? [];
-    const suitOrder: Record<string, number> = { spade: 0, heart: 1, diamond: 2, club: 3 };
-    return [...hand].sort((a, b) => {
-      const suitDiff = (suitOrder[a.suit ?? ""] ?? 9) - (suitOrder[b.suit ?? ""] ?? 9);
-      if (suitDiff !== 0) return suitDiff;
-      const rankA = a.rank === 1 ? 14 : a.rank;
-      const rankB = b.rank === 1 ? 14 : b.rank;
-      return rankA - rankB;
-    });
-  }, [G.hands, myID]);
+  // Sort hand like the 500 board: suits interleaved by colour so no two
+  // same-colour suits sit next to each other, ranks ascending (ace high).
+  const sortedHand = useMemo(() => sortHand(G.hands[myID] ?? []), [G.hands, myID]);
 
   // ── Moves ────────────────────────────────────────────────────────────────────
 
@@ -707,6 +742,23 @@ export function PiratbridgeBoard({
             {G.phase === "playing" && (
               <span className="text-[11px] text-white/40">
                 Trick {showingLastTrick ? G.trickCount : G.trickCount + 1} of {G.cardsThisRound}
+              </span>
+            )}
+            {G.betsRevealed && (
+              <span className="text-[11px] font-semibold">
+                <span className="text-white/40">Total bid: </span>
+                <span
+                  className={
+                    totalBid > G.cardsThisRound
+                      ? "text-rose-300"
+                      : totalBid < G.cardsThisRound
+                        ? "text-sky-300"
+                        : "text-amber-300"
+                  }
+                >
+                  {totalBid}
+                </span>
+                <span className="text-white/40"> of {G.cardsThisRound} trick{G.cardsThisRound !== 1 ? "s" : ""}</span>
               </span>
             )}
             <span className="text-[11px] text-white/40">
