@@ -4,5 +4,12 @@
 export const SERVER_URL =
   process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:8000";
 
-/** boardgame.io game name — must match FiveHundred.name on the server. */
-export const GAME_NAME = "five-hundred";
+export const GAME_IDS = {
+  fiveHundred: "five-hundred",
+  piratbridge: "piratbridge",
+} as const;
+
+export type GameId = (typeof GAME_IDS)[keyof typeof GAME_IDS];
+
+/** @deprecated Use GAME_IDS.fiveHundred */
+export const GAME_NAME = GAME_IDS.fiveHundred;

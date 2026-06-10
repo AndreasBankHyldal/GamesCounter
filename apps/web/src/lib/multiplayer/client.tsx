@@ -2,8 +2,9 @@
 
 import { Client } from "boardgame.io/react";
 import { SocketIO } from "boardgame.io/multiplayer";
-import { FiveHundred } from "@gamescounter/games";
+import { FiveHundred, Piratbridge } from "@gamescounter/games";
 import { FiveHundredBoard } from "@/components/multiplayer/FiveHundredBoard";
+import { PiratbridgeBoard } from "@/components/multiplayer/PiratbridgeBoard";
 import { SERVER_URL } from "./config";
 
 /**
@@ -14,6 +15,16 @@ import { SERVER_URL } from "./config";
 export const FiveHundredClient = Client({
   game: FiveHundred,
   board: FiveHundredBoard,
+  multiplayer: SocketIO({ server: SERVER_URL }),
+  debug: false,
+});
+
+/**
+ * boardgame.io React client for Piratbridge, wired to the server over SocketIO.
+ */
+export const PiratbridgeClient = Client({
+  game: Piratbridge,
+  board: PiratbridgeBoard,
   multiplayer: SocketIO({ server: SERVER_URL }),
   debug: false,
 });

@@ -1,5 +1,5 @@
 import { LobbyClient } from "boardgame.io/client";
-import { GAME_NAME, SERVER_URL } from "./config";
+import { GAME_IDS, GAME_NAME, SERVER_URL } from "./config";
 
 const lobby = new LobbyClient({ server: SERVER_URL });
 
@@ -32,24 +32,50 @@ export interface RoomInfo {
   matchID: string;
   players: RoomPlayer[];
   gameover?: unknown;
+  /** Resolved game id (e.g. "five-hundred" or "piratbridge"). */
+  gameId: string;
 }
 
 function avatarData(avatar?: AvatarChoice): PlayerData {
   return avatar ? { avatarStyle: avatar.styleKey, avatarSeed: avatar.seed } : {};
 }
 
+/**
+ * Try each known game namespace until one responds for this room code.
+ * Used when a player follows an invite link without knowing the game type.
+ */
+export async function resolveGame(code: string): Promise<string> {
+  const gameIds = Object.values(GAME_IDS);
+  for (const gameId of gameIds) {
+    try {
+      await lobby.getMatch(gameId, code);
+      return gameId;
+    } catch {
+      // Not found in this namespace — try the next.
+    }
+  }
+  throw new Error("Room not found — it may have expired.");
+}
+
 /** Create a private match and return its 6-char room code. */
 export async function createRoom(
   numPlayers: number,
-  options?: { jokers?: number; winningScore?: number }
+  options?: { jokers?: number; winningScore?: number; startingCards?: number; openFinalRound?: boolean },
+  gameId: string = GAME_NAME
 ): Promise<string> {
-  const { matchID } = await lobby.createMatch(GAME_NAME, {
+  const { matchID } = await lobby.createMatch(gameId, {
     numPlayers,
     unlisted: true,
-    setupData: {
-      jokers: options?.jokers ?? 2,
-      winningScore: options?.winningScore ?? 500,
-    },
+    setupData:
+      gameId === GAME_IDS.piratbridge
+        ? {
+            startingCards: options?.startingCards,
+            openFinalRound: options?.openFinalRound ?? false,
+          }
+        : {
+            jokers: options?.jokers ?? 2,
+            winningScore: options?.winningScore ?? 500,
+          },
   });
   return matchID;
 }
@@ -62,22 +88,26 @@ export async function joinRoom(
   code: string,
   playerName: string,
   avatar?: AvatarChoice,
-  playerID?: string
+  playerID?: string,
+  gameId: string = GAME_NAME
 ): Promise<{ playerID: string; playerCredentials: string }> {
-  return lobby.joinMatch(GAME_NAME, code, {
+  return lobby.joinMatch(gameId, code, {
     playerName,
     data: avatarData(avatar),
     ...(playerID !== undefined ? { playerID } : {}),
   });
 }
 
-/** Fetch current room metadata (seats + names + avatars) for the waiting room. */
-export async function getRoom(code: string): Promise<RoomInfo> {
-  const match = await lobby.getMatch(GAME_NAME, code);
+/** Fetch current room metadata (seats + names + avatars) for the waiting room.
+ *  If gameId is not known, it will be resolved via resolveGame() automatically. */
+export async function getRoom(code: string, gameId?: string): Promise<RoomInfo> {
+  const resolvedGameId = gameId ?? (await resolveGame(code));
+  const match = await lobby.getMatch(resolvedGameId, code);
   return {
     matchID: match.matchID,
     players: match.players as RoomPlayer[],
     gameover: match.gameover,
+    gameId: resolvedGameId,
   };
 }
 
@@ -86,17 +116,19 @@ export async function updatePlayerData(
   code: string,
   playerID: string,
   credentials: string,
-  data: PlayerData
+  data: PlayerData,
+  gameId: string = GAME_NAME
 ): Promise<void> {
-  await lobby.updatePlayer(GAME_NAME, code, { playerID, credentials, data });
+  await lobby.updatePlayer(gameId, code, { playerID, credentials, data });
 }
 
 export async function leaveRoom(
   code: string,
   playerID: string,
-  credentials: string
+  credentials: string,
+  gameId: string = GAME_NAME
 ): Promise<void> {
-  await lobby.leaveMatch(GAME_NAME, code, { playerID, credentials });
+  await lobby.leaveMatch(gameId, code, { playerID, credentials });
 }
 
 /**
@@ -109,9 +141,10 @@ export async function startRoom(
   code: string,
   playerID: string,
   credentials: string,
-  avatar?: AvatarChoice
+  avatar?: AvatarChoice,
+  gameId: string = GAME_NAME
 ): Promise<void> {
-  await lobby.updatePlayer(GAME_NAME, code, {
+  await lobby.updatePlayer(gameId, code, {
     playerID,
     credentials,
     data: { started: true, ...avatarData(avatar) },
