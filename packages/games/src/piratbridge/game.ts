@@ -94,6 +94,8 @@ const playCard: MoveFn<PiratbridgeState> = (
     G.trickCount += 1;
     G.trickLeader = winnerId;
     G.log.push(`${tag(winnerId)} won trick ${G.trickCount}.`);
+    // Keep the finished trick on the table until the winner leads the next one.
+    G.lastTrick = { cards: G.currentTrick, winnerID: winnerId };
     G.currentTrick = [];
     G.leadSuit = null;
 
@@ -138,6 +140,7 @@ const nextRoundMove: MoveFn<PiratbridgeState> = ({
   G.bets = Object.fromEntries(ctx.playOrder.map((pid) => [pid, null]));
   G.betsRevealed = false;
   G.currentTrick = [];
+  G.lastTrick = null;
   G.leadSuit = null;
   G.trickLeader = newTrickLeader;
   G.trickCount = 0;
@@ -184,6 +187,7 @@ export const Piratbridge: Game<
       bets: Object.fromEntries(playerIDs.map((pid) => [pid, null])),
       betsRevealed: false,
       currentTrick: [],
+      lastTrick: null,
       leadSuit: null,
       trickLeader: String(1 % numPlayers), // Player after dealer (seat 0)
       trickCount: 0,
@@ -247,6 +251,10 @@ export const Piratbridge: Game<
           move: nextRoundMove,
         },
       },
+      // nextRound ends this phase with events.endPhase(); without an explicit
+      // next, boardgame.io would drop into the null phase where placeBet isn't
+      // a move — bets in round 2+ were silently rejected.
+      next: "betting",
     },
   },
 

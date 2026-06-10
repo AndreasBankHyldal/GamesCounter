@@ -70,8 +70,11 @@ function CardFace({
 /** Small card-back stack representing hidden hand size. */
 function CardBacks({ count }: { count: number }) {
   const shown = Math.min(count, 5);
+  // The container needs an explicit height: its children are absolutely
+  // positioned, so without it the stack collapses and the cards overlap
+  // whatever sits above (the name tag / bet row).
   return (
-    <div className="relative flex items-center" style={{ width: 28 + shown * 4 }}>
+    <div className="relative h-10 flex items-center" style={{ width: 28 + shown * 4 }}>
       {Array.from({ length: shown }).map((_, i) => (
         <div
           key={i}
@@ -106,7 +109,8 @@ interface PlayerSlotProps {
   betsRevealed: boolean;
   isOpenFinal: boolean;
   gamePhase: PiratbridgeState["phase"];
-  compact?: boolean;
+  /** My own seat: no card stack (the hand lives in the bottom dock). */
+  isMe?: boolean;
 }
 
 function PlayerSlot({
@@ -122,7 +126,7 @@ function PlayerSlot({
   betsRevealed,
   isOpenFinal,
   gamePhase,
-  compact,
+  isMe,
 }: PlayerSlotProps) {
   const firstName = name.split(" ")[0];
   const betDisplay =
@@ -138,11 +142,11 @@ function PlayerSlot({
 
   return (
     <div
-      className={`flex flex-col items-center gap-1 rounded-2xl border px-3 py-2 transition ${
+      className={`flex w-[104px] flex-col items-center gap-1 rounded-2xl border px-2 py-2 backdrop-blur-sm transition ${
         isCurrentPlayer && gamePhase === "playing"
-          ? "border-amber-400/70 bg-white/10"
-          : "border-white/10 bg-white/5"
-      } ${compact ? "min-w-[80px]" : "min-w-[100px]"}`}
+          ? "border-amber-400/80 bg-black/50 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+          : "border-white/10 bg-black/40"
+      }`}
     >
       {/* Avatar + name row */}
       <div className="flex items-center gap-1.5">
@@ -151,7 +155,7 @@ function PlayerSlot({
         ) : (
           <span className="h-6 w-6 rounded-full bg-white/20" />
         )}
-        <span className="max-w-[70px] truncate text-xs font-semibold text-white">
+        <span className="max-w-[60px] truncate text-xs font-semibold text-white">
           {firstName}
         </span>
         {isDealer && (
@@ -160,69 +164,34 @@ function PlayerSlot({
       </div>
 
       {/* Bet / tricks row */}
-      <div className="flex items-center gap-2 text-[11px]">
-        <span className="text-white/60">Bet:</span>
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <span className="text-white/60">Bet</span>
         <span className={`font-bold ${betsRevealed ? "text-amber-300" : "text-white/70"}`}>
           {betDisplay}
         </span>
         {gamePhase !== "betting" && (
           <>
             <span className="text-white/40">·</span>
-            <span className="text-white/60">Won:</span>
+            <span className="text-white/60">Won</span>
             <span className="font-bold text-green-400">{tricksWon}</span>
           </>
         )}
       </div>
 
-      {/* Open final round: show their card face-up */}
-      {isOpenFinal && hand.length > 0 ? (
-        <div className="mt-1 flex gap-1">
-          {hand.map((c) => (
-            <CardFace key={c.id} card={c} small />
-          ))}
-        </div>
-      ) : (
-        <div className="mt-1">
-          <CardBacks count={handCount} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Trick display ─────────────────────────────────────────────────────────────
-
-function TrickDisplay({
-  trick,
-  myID,
-  playOrder,
-  getName,
-}: {
-  trick: TrickCard[];
-  myID: string;
-  playOrder: string[];
-  getName: (pid: string) => string;
-}) {
-  if (trick.length === 0) return null;
-
-  const myIndex = playOrder.indexOf(myID);
-  const numPlayers = playOrder.length;
-
-  // Order trick cards: mine first (if present), then clockwise
-  const sorted = [...trick].sort((a, b) => {
-    const ai = (playOrder.indexOf(a.playerID) - myIndex + numPlayers) % numPlayers;
-    const bi = (playOrder.indexOf(b.playerID) - myIndex + numPlayers) % numPlayers;
-    return ai - bi;
-  });
-
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-3">
-      {sorted.map(({ playerID, card }) => (
-        <div key={playerID} className="flex flex-col items-center gap-1">
-          <CardFace card={card} small />
-          <span className="text-[10px] text-white/60">{getName(playerID).split(" ")[0]}</span>
-        </div>
-      ))}
+      {/* Card stack below the text so it never covers the name/bet (mine
+          lives in the bottom dock instead). */}
+      {!isMe &&
+        (isOpenFinal && hand.length > 0 ? (
+          <div className="mt-1 flex gap-1">
+            {hand.map((c) => (
+              <CardFace key={c.id} card={c} small />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-1">
+            <CardBacks count={handCount} />
+          </div>
+        ))}
     </div>
   );
 }
@@ -294,13 +263,8 @@ export function PiratbridgeBoard({
 
   const isOpenFinal = G.openFinalRound && G.cardsThisRound === 1;
 
-  // Opponents in clockwise order from me (plays-after me first)
   const myIndex = ctx.playOrder.indexOf(myID);
   const numPlayers = ctx.numPlayers;
-  const opponentIDs = Array.from(
-    { length: numPlayers - 1 },
-    (_, i) => ctx.playOrder[(myIndex + 1 + i) % numPlayers]
-  );
 
   // Determine which cards are legally playable this trick
   const leadSuit = G.leadSuit;
@@ -417,46 +381,56 @@ export function PiratbridgeBoard({
 
   // ── Layout helpers ──────────────────────────────────────────────────────────
 
-  // Map opponent index to screen position classes.
-  // Opponents[0] plays right after me → appears on RIGHT side.
-  // Opponents[last] plays right before me → appears on LEFT side.
-  // Middle opponents appear across the top.
-  const N = opponentIDs.length; // 1-5
-
-  // We lay out opponents in a row at top with left/right flanks for 3+
-  function getOpponentLayout() {
-    if (N === 1) return { top: [0], left: [], right: [] };
-    if (N === 2) return { top: [], left: [1], right: [0] };
-    if (N === 3) return { top: [1], left: [2], right: [0] };
-    if (N === 4) return { top: [1, 2], left: [3], right: [0] };
-    return { top: [1, 2, 3], left: [4], right: [0] }; // 5 opponents
+  // Everyone sits around an oval table. I'm at the bottom (90° in screen
+  // coordinates, where y points down); each next player in turn order sits one
+  // step CLOCKWISE around the table (bottom → left → top → right), matching
+  // how play passes at a physical table.
+  function seatOffset(pid: string): number {
+    return (ctx.playOrder.indexOf(pid) - myIndex + numPlayers) % numPlayers;
   }
 
-  const opponentLayout = getOpponentLayout();
+  function seatStyle(pid: string, radiusX: number, radiusY: number) {
+    const theta = (Math.PI / 180) * (90 + (seatOffset(pid) * 360) / numPlayers);
+    return {
+      left: `${50 + radiusX * Math.cos(theta)}%`,
+      top: `${50 + radiusY * Math.sin(theta)}%`,
+    };
+  }
 
-  function renderOpponent(i: number, compact = false) {
-    const pid = opponentIDs[i];
-    if (!pid) return null;
+  function renderSeat(pid: string) {
     const av = getAvatar(pid);
     return (
-      <PlayerSlot
+      <div
         key={pid}
-        name={getName(pid)}
-        avatarStyle={av?.styleKey}
-        avatarSeed={av?.seed}
-        bet={G.bets[pid]}
-        tricksWon={G.tricksWon[pid] ?? 0}
-        handCount={G.handCounts?.[pid] ?? 0}
-        hand={G.hands[pid] ?? []}
-        isDealer={String(G.dealerSeat) === pid}
-        isCurrentPlayer={ctx.currentPlayer === pid}
-        betsRevealed={G.betsRevealed}
-        isOpenFinal={isOpenFinal}
-        gamePhase={G.phase}
-        compact={compact}
-      />
+        className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
+        style={seatStyle(pid, 42, 41)}
+      >
+        <PlayerSlot
+          name={getName(pid)}
+          avatarStyle={av?.styleKey}
+          avatarSeed={av?.seed}
+          bet={G.bets[pid]}
+          tricksWon={G.tricksWon[pid] ?? 0}
+          handCount={G.handCounts?.[pid] ?? 0}
+          hand={G.hands[pid] ?? []}
+          isDealer={String(G.dealerSeat) === pid}
+          isCurrentPlayer={ctx.currentPlayer === pid}
+          betsRevealed={G.betsRevealed}
+          isOpenFinal={isOpenFinal}
+          gamePhase={G.phase}
+          isMe={pid === myID}
+        />
+      </div>
     );
   }
+
+  // The trick on display: the live trick while cards are being played, or the
+  // finished one — which stays on the table until the winner leads the next
+  // card (or the round ends and the overlay takes over).
+  const showingLastTrick = G.currentTrick.length === 0 && G.lastTrick !== null;
+  const displayTrick: TrickCard[] = G.currentTrick.length > 0
+    ? G.currentTrick
+    : G.lastTrick?.cards ?? [];
 
   // ── Round over / Game over overlays ──────────────────────────────────────────
 
@@ -686,55 +660,58 @@ export function PiratbridgeBoard({
       {/* ── Table area ─────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col gap-4 p-4">
 
-        {/* Top opponents row */}
-        {opponentLayout.top.length > 0 && (
-          <div className="flex justify-center gap-3">
-            {opponentLayout.top.map((i) => renderOpponent(i))}
-          </div>
-        )}
+        {/* The round table everyone sits around */}
+        <div className="relative mx-auto min-h-[360px] w-full max-w-3xl flex-1 sm:min-h-[420px]">
+          {/* Table top: felt oval with a wooden rim */}
+          <div
+            className="absolute left-1/2 top-1/2 h-[72%] w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-[10px] border-[#5d3a1d] bg-[radial-gradient(ellipse_at_center,#2e7d4f_0%,#236b41_55%,#175033_100%)] shadow-[inset_0_0_60px_rgba(0,0,0,0.45),0_12px_30px_rgba(0,0,0,0.5)] ring-2 ring-black/50"
+            aria-hidden
+          />
 
-        {/* Middle row: left flank + center trick/status + right flank */}
-        <div className="flex flex-1 items-center justify-between gap-3">
-          <div className="flex flex-col gap-2">
-            {opponentLayout.left.map((i) => renderOpponent(i, true))}
-          </div>
+          {/* Seats: everyone around the table, clockwise in turn order */}
+          {ctx.playOrder.map((pid) => renderSeat(pid))}
 
-          {/* ── Center: trick display + status ─────────────────── */}
-          <div className="flex flex-1 flex-col items-center justify-center gap-3">
-            {/* Lead suit badge */}
+          {/* Played cards, each in front of the player who played it */}
+          {displayTrick.map(({ playerID: pid, card }) => {
+            const won = showingLastTrick && G.lastTrick?.winnerID === pid;
+            return (
+              <div
+                key={card.id}
+                className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+                style={seatStyle(pid, 19, 18)}
+              >
+                <div className={`flex flex-col items-center gap-0.5 ${showingLastTrick && !won ? "opacity-70" : ""}`}>
+                  <div className={won ? "rounded-lg ring-2 ring-amber-400 shadow-[0_0_14px_rgba(251,191,36,0.6)]" : ""}>
+                    <CardFace card={card} small />
+                  </div>
+                  {won && (
+                    <span className="rounded bg-amber-400/90 px-1 text-[9px] font-bold text-black">
+                      wins
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Centre of the table: lead suit / trick counter / dealer */}
+          <div className="absolute left-1/2 top-1/2 z-0 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5">
             {G.phase === "playing" && G.leadSuit && (
-              <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold">
+              <div className="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-sm font-semibold">
                 <span className={G.leadSuit === "heart" || G.leadSuit === "diamond" ? "text-red-400" : "text-white"}>
                   {SUIT_SYMBOL[G.leadSuit as Suit]}
                 </span>
                 <span className="text-white/70">Lead</span>
               </div>
             )}
-
-            {/* Current trick */}
-            {G.currentTrick.length > 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <TrickDisplay
-                  trick={G.currentTrick}
-                  myID={myID}
-                  playOrder={ctx.playOrder}
-                  getName={getName}
-                />
-              </div>
-            ) : G.phase === "playing" ? (
-              <div className="rounded-2xl border border-dashed border-white/20 px-8 py-6 text-center text-xs text-white/30">
-                Trick {G.trickCount + 1} of {G.cardsThisRound}
-              </div>
-            ) : null}
-
-            {/* Dealer indicator */}
-            <div className="text-xs text-white/40">
-              Dealer: {getName(String(G.dealerSeat))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            {opponentLayout.right.map((i) => renderOpponent(i, true))}
+            {G.phase === "playing" && (
+              <span className="text-[11px] text-white/40">
+                Trick {showingLastTrick ? G.trickCount : G.trickCount + 1} of {G.cardsThisRound}
+              </span>
+            )}
+            <span className="text-[11px] text-white/40">
+              Dealer: {getName(String(G.dealerSeat)).split(" ")[0]}
+            </span>
           </div>
         </div>
 

@@ -7,6 +7,12 @@ export interface TrickCard {
   card: Card;
 }
 
+/** A finished trick, kept on the table until the winner leads the next one. */
+export interface CompletedTrick {
+  cards: TrickCard[];
+  winnerID: PlayerID;
+}
+
 export interface RoundResult {
   roundNumber: number;
   cardsDealt: number;
@@ -28,6 +34,8 @@ export interface PiratbridgeState {
   betsRevealed: boolean;
   /** Cards played in the current trick, in play order. */
   currentTrick: TrickCard[];
+  /** The previous trick, shown on the table until the next trick starts. */
+  lastTrick: CompletedTrick | null;
   /** Suit of the first card played in the current trick. */
   leadSuit: string | null;
   /** PlayerID who leads (plays first in) the current/next trick. */
