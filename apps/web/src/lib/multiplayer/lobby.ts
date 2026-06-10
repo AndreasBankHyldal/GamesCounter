@@ -41,20 +41,14 @@ function avatarData(avatar?: AvatarChoice): PlayerData {
 }
 
 /**
- * Try each known game namespace until one responds for this room code.
- * Used when a player follows an invite link without knowing the game type.
+ * Resolve which game a room code belongs to. boardgame.io's
+ * GET /games/:name/:id ignores the :name segment and fetches by matchID
+ * alone, so we can ask under any namespace — the response's `gameName`
+ * metadata field is the authoritative answer.
  */
 export async function resolveGame(code: string): Promise<string> {
-  const gameIds = Object.values(GAME_IDS);
-  for (const gameId of gameIds) {
-    try {
-      await lobby.getMatch(gameId, code);
-      return gameId;
-    } catch {
-      // Not found in this namespace — try the next.
-    }
-  }
-  throw new Error("Room not found — it may have expired.");
+  const match = await lobby.getMatch(GAME_NAME, code);
+  return (match as { gameName?: string }).gameName ?? GAME_NAME;
 }
 
 /** Create a private match and return its 6-char room code. */
@@ -99,15 +93,15 @@ export async function joinRoom(
 }
 
 /** Fetch current room metadata (seats + names + avatars) for the waiting room.
- *  If gameId is not known, it will be resolved via resolveGame() automatically. */
+ *  The returned gameId always comes from the match's own metadata, so a stale
+ *  or wrong hint can never misidentify the game. */
 export async function getRoom(code: string, gameId?: string): Promise<RoomInfo> {
-  const resolvedGameId = gameId ?? (await resolveGame(code));
-  const match = await lobby.getMatch(resolvedGameId, code);
+  const match = await lobby.getMatch(gameId ?? GAME_NAME, code);
   return {
     matchID: match.matchID,
     players: match.players as RoomPlayer[],
     gameover: match.gameover,
-    gameId: resolvedGameId,
+    gameId: (match as { gameName?: string }).gameName ?? gameId ?? GAME_NAME,
   };
 }
 
