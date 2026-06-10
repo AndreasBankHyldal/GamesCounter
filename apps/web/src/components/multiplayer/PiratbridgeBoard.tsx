@@ -338,6 +338,15 @@ export function PiratbridgeBoard({
     moves.nextRound();
   }
 
+  function doLeave() {
+    const ok = window.confirm(
+      "Leave the game? You won't be able to rejoin this round."
+    );
+    if (!ok) return;
+    clearIdentity(matchID);
+    router.push("/");
+  }
+
   // ── Rematch (host creates new room, others follow) ────────────────────────────
 
   async function proposeRematch() {
@@ -656,13 +665,6 @@ export function PiratbridgeBoard({
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="flex items-center justify-between gap-2 border-b border-white/10 bg-black/20 px-4 py-2">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.replace("/play")}
-            className="text-white/50 hover:text-white text-sm"
-          >
-            ←
-          </button>
           <span className="text-sm font-bold text-white">Piratbridge</span>
           <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-white/60">
             Round {G.roundNumber}
@@ -689,6 +691,14 @@ export function PiratbridgeBoard({
             className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-400" : "bg-red-400"}`}
             title={isConnected ? "Connected" : "Disconnected"}
           />
+          {/* Leave the room — same pill as the 500 board for a consistent look. */}
+          <button
+            type="button"
+            onClick={doLeave}
+            className="rounded-full bg-black/40 px-3 py-1 text-xs text-white/80 hover:bg-black/60"
+          >
+            Leave
+          </button>
         </div>
       </header>
 
@@ -717,7 +727,7 @@ export function PiratbridgeBoard({
               >
                 <div className={`flex flex-col items-center gap-0.5 ${showingLastTrick && !won ? "opacity-70" : ""}`}>
                   <div className={won ? "rounded-lg ring-2 ring-amber-400 shadow-[0_0_14px_rgba(251,191,36,0.6)]" : ""}>
-                    <CardFace card={card} small />
+                    <CardFace card={card} />
                   </div>
                   {won && (
                     <span className="rounded bg-amber-400/90 px-1 text-[9px] font-bold text-black">
