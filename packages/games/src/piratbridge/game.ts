@@ -31,7 +31,9 @@ function evaluateTrick(trick: TrickCard[]): PlayerID {
 /** Apply round scoring and push history. Sets G.phase to "roundOver" or "gameOver". */
 function settleRound(G: PiratbridgeState, playOrder: PlayerID[]): void {
   const bets = G.bets as Record<PlayerID, number>;
-  const deltas = scoreRound(bets, G.tricksWon);
+  // The final (1-card) round pays double base for a correct guess: 10 + bet.
+  const correctBase = G.cardsThisRound === 1 ? 10 : 5;
+  const deltas = scoreRound(bets, G.tricksWon, correctBase);
   for (const pid of playOrder) {
     G.scores[pid] = (G.scores[pid] ?? 0) + (deltas[pid] ?? 0);
   }
