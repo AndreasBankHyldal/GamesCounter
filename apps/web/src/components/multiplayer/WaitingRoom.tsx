@@ -32,8 +32,6 @@ export function WaitingRoom({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   const navigated = useRef(false);
 
-  // Copy a shareable link to this room (full URL including the code) so the
-  // host can send it to friends, e.g. https://games-counter.vercel.app/play/ABC123
   const copyInviteLink = useCallback(async () => {
     const url = `${window.location.origin}/play/${code}`;
     try {
@@ -41,13 +39,10 @@ export function WaitingRoom({ code }: { code: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard blocked (rare) — fall back to a prompt so the link is still
-      // selectable/copyable by hand.
       window.prompt("Copy this invite link:", url);
     }
   }, [code]);
 
-  // Load any saved identity for this room after mount.
   useEffect(() => {
     setIdentity(loadIdentity(code));
     setHydrated(true);
@@ -55,14 +50,18 @@ export function WaitingRoom({ code }: { code: string }) {
 
   const refresh = useCallback(async () => {
     try {
-      setRoom(await getRoom(code));
-      setError((e) => (e === "Room not found — it may have expired." ? null : e));
+      // Pass the known gameId from identity to avoid resolveGame round-trips.
+      const knownGameId = loadIdentity(code)?.gameId;
+      const freshRoom = await getRoom(code, knownGameId);
+      setRoom(freshRoom);
+      setError((e) =>
+        e === "Room not found — it may have expired." ? null : e
+      );
     } catch {
       setError("Room not found — it may have expired.");
     }
   }, [code]);
 
-  // Poll the room metadata while waiting.
   useEffect(() => {
     if (!hydrated) return;
     refresh();
@@ -70,7 +69,6 @@ export function WaitingRoom({ code }: { code: string }) {
     return () => clearInterval(timer);
   }, [hydrated, refresh]);
 
-  // When the host has started, everyone advances to the table together.
   const started = room?.players.find((p) => p.id === 0)?.data?.started === true;
   useEffect(() => {
     if (started && identity && !navigated.current) {
@@ -84,13 +82,22 @@ export function WaitingRoom({ code }: { code: string }) {
     const player = name.trim();
     if (!player) return setError("Enter your name.");
     try {
-      const { playerID, playerCredentials } = await joinRoom(code, player, avatar);
+      // room.gameId was resolved during the getRoom poll — use it.
+      const gameId = room?.gameId;
+      const { playerID, playerCredentials } = await joinRoom(
+        code,
+        player,
+        avatar,
+        undefined,
+        gameId
+      );
       const id: Identity = {
         playerID,
         credentials: playerCredentials,
         name: player,
         avatarStyle: avatar.styleKey,
         avatarSeed: avatar.seed,
+        gameId,
       };
       saveIdentity(code, id);
       setIdentity(id);
@@ -108,7 +115,13 @@ export function WaitingRoom({ code }: { code: string }) {
         identity.avatarStyle && identity.avatarSeed
           ? { styleKey: identity.avatarStyle, seed: identity.avatarSeed }
           : undefined;
-      await startRoom(code, identity.playerID, identity.credentials, ownAvatar);
+      await startRoom(
+        code,
+        identity.playerID,
+        identity.credentials,
+        ownAvatar,
+        identity.gameId
+      );
       router.replace(`/play/${code}/table`);
     } catch {
       setError("Couldn't start the game.");
@@ -119,7 +132,7 @@ export function WaitingRoom({ code }: { code: string }) {
   async function leave() {
     if (identity) {
       try {
-        await leaveRoom(code, identity.playerID, identity.credentials);
+        await leaveRoom(code, identity.playerID, identity.credentials, identity.gameId);
       } catch {
         /* ignore */
       }
@@ -130,7 +143,6 @@ export function WaitingRoom({ code }: { code: string }) {
 
   if (!hydrated) return null;
 
-  // Visited the link without joining yet → inline join form.
   if (!identity) {
     return (
       <main className="felt flex flex-1 flex-col items-center justify-center px-5 py-12">
@@ -139,6 +151,11 @@ export function WaitingRoom({ code }: { code: string }) {
           <p className="mb-6 text-center text-3xl font-bold tracking-[0.3em] text-amber-300">
             {code}
           </p>
+          {room?.gameId && (
+            <p className="mb-4 text-center text-sm text-white/50">
+              {room.gameId === "piratbridge" ? "Piratbridge" : "500"}
+            </p>
+          )}
           <form onSubmit={joinHere} className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <AvatarField value={avatar} onChange={setAvatar} size={56} />

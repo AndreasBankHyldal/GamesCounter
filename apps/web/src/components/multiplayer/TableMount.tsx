@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FiveHundredClient } from "@/lib/multiplayer/client";
+import { FiveHundredClient, PiratbridgeClient } from "@/lib/multiplayer/client";
 import { loadIdentity, type Identity } from "@/lib/multiplayer/identity";
+import { GAME_IDS } from "@/lib/multiplayer/config";
 
 export function TableMount({ code }: { code: string }) {
   const router = useRouter();
@@ -13,12 +14,11 @@ export function TableMount({ code }: { code: string }) {
   useEffect(() => {
     const id = loadIdentity(code);
     if (!id) {
-      // Not joined on this device — send to the waiting room to join.
       router.replace(`/play/${code}`);
       return;
     }
     setIdentity(id);
-    setReady(true); // only mount the socket client on the client side
+    setReady(true);
   }, [code, router]);
 
   if (!ready || !identity) {
@@ -29,15 +29,19 @@ export function TableMount({ code }: { code: string }) {
     );
   }
 
+  const sharedProps = {
+    matchID: code,
+    playerID: identity.playerID,
+    credentials: identity.credentials,
+  };
+
   return (
     <div className="felt relative min-h-screen">
-      {/* The in-board Leave button flags the player as left (so their turns are
-          skipped) before navigating away — see FiveHundredBoard. */}
-      <FiveHundredClient
-        matchID={code}
-        playerID={identity.playerID}
-        credentials={identity.credentials}
-      />
+      {identity.gameId === GAME_IDS.piratbridge ? (
+        <PiratbridgeClient {...sharedProps} />
+      ) : (
+        <FiveHundredClient {...sharedProps} />
+      )}
     </div>
   );
 }

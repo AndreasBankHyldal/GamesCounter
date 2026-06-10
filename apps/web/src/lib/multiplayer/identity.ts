@@ -7,6 +7,8 @@ export interface Identity {
   name: string;
   avatarStyle?: string;
   avatarSeed?: string;
+  /** boardgame.io game name — used by TableMount to pick the right board. */
+  gameId?: string;
 }
 
 const key = (code: string) => `gc:mp:${code.toUpperCase()}`;

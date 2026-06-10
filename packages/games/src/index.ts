@@ -1,8 +1,17 @@
 import type { Game } from "boardgame.io";
 import { FiveHundred } from "./five-hundred/game";
+import { Piratbridge } from "./piratbridge/game";
 
 export * from "./cards";
 export * from "./five-hundred";
+// Selective export to avoid collision with five-hundred's RoundResult/scoreRound.
+export { Piratbridge } from "./piratbridge/game";
+export type {
+  PiratbridgeState,
+  PiratbridgeSetupData,
+  TrickCard,
+  GamePhase,
+} from "./piratbridge/types";
 
 /** Display metadata for each multiplayer game, keyed by its boardgame.io name. */
 export interface GameInfo {
@@ -22,6 +31,14 @@ export const GAME_REGISTRY: Record<string, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 6,
     game: FiveHundred,
+  },
+  piratbridge: {
+    id: "piratbridge",
+    name: "Piratbridge",
+    tagline: "Bid blind, play trump — most points wins.",
+    minPlayers: 2,
+    maxPlayers: 6,
+    game: Piratbridge,
   },
 };
 

@@ -1,5 +1,5 @@
 import { Server, Origins } from "boardgame.io/server";
-import { FiveHundred } from "@gamescounter/games";
+import { FiveHundred, Piratbridge } from "@gamescounter/games";
 import { makeRoomCode } from "./codes";
 import { startCleanup } from "./cleanup";
 import { startKeepAlive } from "./keepalive";
@@ -21,7 +21,7 @@ const db = process.env.DATABASE_URL
   : undefined;
 
 const server = Server({
-  games: [FiveHundred],
+  games: [FiveHundred, Piratbridge],
   origins,
   db,
   // Matches are private (unlisted) and addressed by a short shareable code.
@@ -37,6 +37,6 @@ startKeepAlive();
 
 server.run(PORT, () => {
   console.log(`boardgame.io server listening on :${PORT}`);
-  console.log(`Games: ${[FiveHundred.name].join(", ")}`);
+  console.log(`Games: ${[FiveHundred.name, Piratbridge.name].join(", ")}`);
   console.log(`Storage: ${db ? "Postgres (persistent)" : "in-memory"}`);
 });
