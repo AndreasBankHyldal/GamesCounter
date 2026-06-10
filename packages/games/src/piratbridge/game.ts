@@ -262,8 +262,10 @@ export const Piratbridge: Game<
     // A client connected under the wrong game name routes another game's
     // state through here; an empty view beats crashing the whole server.
     if (!G?.hands || !G?.bets) return {} as PiratbridgeState;
-    const isOpenFinal =
-      G.openFinalRound && G.cardsThisRound === 1 && G.phase !== "betting";
+    // Open final round: everyone's card is revealed BEFORE betting — players
+    // bet knowing every card except their own (the UI keeps one's own card
+    // face-down). So the reveal must include the betting phase.
+    const isOpenFinal = G.openFinalRound && G.cardsThisRound === 1;
 
     const handCounts: Record<PlayerID, number> = {};
     const hands: Record<PlayerID, Card[]> = {};
