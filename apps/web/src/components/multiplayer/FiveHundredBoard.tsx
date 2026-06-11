@@ -451,21 +451,9 @@ export function FiveHundredBoard({
 
   return (
     <div className="felt relative flex min-h-screen flex-col gap-4 px-4 pb-8 pt-3 text-white">
-      {/* Leave the game — flags you as left so the server skips your turns and
-          the others keep playing. (Solo play has its own exit link in
-          SoloMount, where there's no one to unblock.) */}
-      {matchID !== "solo" && (
-        <button
-          type="button"
-          onClick={doLeave}
-          className="absolute right-3 top-3 z-20 rounded-full bg-black/40 px-3 py-1 text-xs text-white/80 hover:bg-black/60"
-        >
-          Leave
-        </button>
-      )}
-
-      {/* Status bar (pushed below the Leave button) */}
-      <div className="flex items-center justify-between text-sm">
+      {/* Status bar. The right side stacks the Leave button above the
+          connection indicator so they never overlap. */}
+      <div className="flex items-start justify-between text-sm">
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-black/30 px-3 py-1 font-semibold">
             Round {G.roundNumber}
@@ -495,9 +483,23 @@ export function FiveHundredBoard({
                   : "Your turn — draw"
                 : `${nameFor(ctx.currentPlayer)}'s turn`}
         </span>
-        <span className={`text-xs ${isConnected ? "text-emerald-300" : "text-rose-300"}`}>
-          {isConnected ? "● online" : "○ offline"}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          {/* Leave the game — flags you as left so the server skips your turns
+              and the others keep playing. (Solo play has its own exit link in
+              SoloMount, where there's no one to unblock.) */}
+          {matchID !== "solo" && (
+            <button
+              type="button"
+              onClick={doLeave}
+              className="rounded-full bg-black/40 px-3 py-1 text-xs text-white/80 hover:bg-black/60"
+            >
+              Leave
+            </button>
+          )}
+          <span className={`text-xs ${isConnected ? "text-emerald-300" : "text-rose-300"}`}>
+            {isConnected ? "● online" : "○ offline"}
+          </span>
+        </div>
       </div>
 
       {/* Round summary / game over */}
@@ -721,11 +723,13 @@ export function FiveHundredBoard({
             </button>
             <button
               type="button"
-              disabled={!canDraw || G.faceUp.length === 0 || !meldsOpen}
+              disabled={!canDraw || G.faceUp.length <= 1 || !meldsOpen}
               title={
                 !meldsOpen
                   ? "Opens once everyone has had a turn"
-                  : "Take the whole pile (then meld or −50)"
+                  : G.faceUp.length === 1
+                    ? "Only one card on the pile — use Take 1"
+                    : "Take the whole pile (then lay 3 consecutive cards or −50)"
               }
               onClick={() => {
                 sfx(playPile);
@@ -747,7 +751,8 @@ export function FiveHundredBoard({
 
       {G.mustMeld && myTurn && !paused && (
         <p className="rounded-lg bg-rose-500/20 px-3 py-2 text-center text-xs text-rose-100">
-          You took the pile — lay down a meld or add cards to the table this turn, or lose 50 points.
+          You took the pile — lay 3+ consecutive cards in one go (a new meld, or one
+          block added to a run on the table) this turn, or lose 50 points.
         </p>
       )}
 
