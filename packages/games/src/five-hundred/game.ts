@@ -314,7 +314,9 @@ export const FiveHundred: Game<
       if (G.hasDrawn) return INVALID_MOVE;
       // Taking the whole pile commits you to melding, which isn't open yet.
       if (!meldingOpen(G.turnsThisRound, ctx.numPlayers)) return INVALID_MOVE;
-      if (G.faceUp.length === 0) return INVALID_MOVE;
+      // A 1-card pile is just the face-up card: use drawFromFaceUp instead of
+      // accidentally taking on the meld obligation for no extra cards.
+      if (G.faceUp.length <= 1) return INVALID_MOVE;
       G.hands[playerID].push(...G.faceUp);
       G.faceUp = [];
       G.hasDrawn = true;
@@ -373,10 +375,15 @@ export const FiveHundred: Game<
 
       meld.cards = res.cards;
       G.hands[playerID] = hand.filter((c) => !cardIds.includes(c.id));
-      // Adding to an existing run satisfies the "take the pile → lay cards"
-      // obligation the same as opening a brand-new meld.
-      G.mustMeld = false;
-      G.meldedThisTurn = true;
+      // The "take the pile → lay cards" obligation is only satisfied by 3+
+      // CONSECUTIVE cards laid in one action — a new meld, or a single block
+      // added to one run (validated here as a run on its own). Scattering
+      // single cards onto different melds does not count.
+      const block = validateNewMeld(cards, declarations, playerID, "pile-block");
+      if (cards.length >= 3 && block.ok) {
+        G.mustMeld = false;
+        G.meldedThisTurn = true;
+      }
       mergeMelds(G, meldId);
       G.log.push(`${tag(playerID)} added cards to the table.`);
     },
