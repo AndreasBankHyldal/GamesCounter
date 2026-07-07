@@ -26,27 +26,55 @@ if (process.env.CLIENT_ORIGIN) origins.push(process.env.CLIENT_ORIGIN);
 // Persist matches in Postgres when DATABASE_URL is set so games survive a
 // server restart / spin-down; otherwise fall back to boardgame.io's in-memory
 // store (fine for local dev).
-const db = process.env.DATABASE_URL
-  ? new PostgresStore(process.env.DATABASE_URL)
-  : undefined;
+//
+// Crucially, a DATABASE_URL that points at a missing/unreachable database (a
+// free Render Postgres is deleted ~30 days after creation) must NOT crash the
+// server. We probe the connection up front and, on failure, fall back to the
+// in-memory store so the whole site stays up — matches just won't persist
+// until the database is fixed or DATABASE_URL is cleared.
+async function resolveDb(): Promise<PostgresStore | undefined> {
+  if (!process.env.DATABASE_URL) return undefined;
+  const store = new PostgresStore(process.env.DATABASE_URL);
+  try {
+    await store.connect();
+    return store;
+  } catch (err) {
+    console.error(
+      "[server] DATABASE_URL is set but Postgres is unreachable — falling back to " +
+        "IN-MEMORY storage. Matches will NOT survive a restart. Fix the database or " +
+        "clear DATABASE_URL to silence this warning.",
+      err
+    );
+    return undefined;
+  }
+}
 
-const server = Server({
-  games: [FiveHundred, Piratbridge, Pubgolf],
-  origins,
-  db,
-  // Matches are private (unlisted) and addressed by a short shareable code.
-  // Overriding `uuid` makes the lobby's create endpoint mint these codes.
-  uuid: () => makeRoomCode(),
-});
+async function main() {
+  const db = await resolveDb();
 
-// Auto-delete matches once everyone has been gone for 15+ minutes.
-startCleanup(server.db);
+  const server = Server({
+    games: [FiveHundred, Piratbridge, Pubgolf],
+    origins,
+    db,
+    // Matches are private (unlisted) and addressed by a short shareable code.
+    // Overriding `uuid` makes the lobby's create endpoint mint these codes.
+    uuid: () => makeRoomCode(),
+  });
 
-// Keep the Render free instance awake during play (no-op off Render).
-startKeepAlive();
+  // Auto-delete matches once everyone has been gone for the game's idle window.
+  startCleanup(server.db);
 
-server.run(PORT, () => {
-  console.log(`boardgame.io server listening on :${PORT}`);
-  console.log(`Games: ${[FiveHundred.name, Piratbridge.name, Pubgolf.name].join(", ")}`);
-  console.log(`Storage: ${db ? "Postgres (persistent)" : "in-memory"}`);
+  // Keep the Render free instance awake during play (no-op off Render).
+  startKeepAlive();
+
+  server.run(PORT, () => {
+    console.log(`boardgame.io server listening on :${PORT}`);
+    console.log(`Games: ${[FiveHundred.name, Piratbridge.name, Pubgolf.name].join(", ")}`);
+    console.log(`Storage: ${db ? "Postgres (persistent)" : "in-memory"}`);
+  });
+}
+
+main().catch((err) => {
+  console.error("[server] fatal startup error:", err);
+  process.exit(1);
 });
