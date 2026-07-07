@@ -7,6 +7,7 @@ export const SERVER_URL =
 export const GAME_IDS = {
   fiveHundred: "five-hundred",
   piratbridge: "piratbridge",
+  pubgolf: "pubgolf",
 } as const;
 
 export type GameId = (typeof GAME_IDS)[keyof typeof GAME_IDS];

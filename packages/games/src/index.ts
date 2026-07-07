@@ -1,6 +1,7 @@
 import type { Game } from "boardgame.io";
 import { FiveHundred } from "./five-hundred/game";
 import { Piratbridge } from "./piratbridge/game";
+import { Pubgolf } from "./pubgolf/game";
 
 export * from "./cards";
 export * from "./five-hundred";
@@ -13,6 +14,26 @@ export type {
   CompletedTrick,
   GamePhase,
 } from "./piratbridge/types";
+// Selective export to avoid collision with five-hundred's PlayerID.
+export { Pubgolf, DEFAULT_RULES } from "./pubgolf/game";
+export { DEFAULT_CRAWL, type PresetStop } from "./pubgolf/templates";
+export {
+  computeStanding,
+  computeStandings,
+  paymentTotals,
+  type Standing,
+} from "./pubgolf/scoring";
+export type {
+  StopType,
+  Stop,
+  HoleScore,
+  Rule,
+  PenaltyApplication,
+  Payment,
+  PubgolfPhase,
+  PubgolfState,
+  PubgolfSetupData,
+} from "./pubgolf/types";
 
 /** Display metadata for each multiplayer game, keyed by its boardgame.io name. */
 export interface GameInfo {
@@ -40,6 +61,14 @@ export const GAME_REGISTRY: Record<string, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 6,
     game: Piratbridge,
+  },
+  pubgolf: {
+    id: "pubgolf",
+    name: "Pubgolf",
+    tagline: "Crawl pub to pub — lowest score wins.",
+    minPlayers: 1,
+    maxPlayers: 12,
+    game: Pubgolf,
   },
 };
 

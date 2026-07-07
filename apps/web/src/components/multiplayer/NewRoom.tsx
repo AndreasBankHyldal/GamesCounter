@@ -24,6 +24,13 @@ const GAMES = [
     minPlayers: 2,
     maxPlayers: 6,
   },
+  {
+    id: GAME_IDS.pubgolf,
+    name: "Pubgolf",
+    tagline: "Crawl pub to pub — lowest score wins.",
+    minPlayers: 1,
+    maxPlayers: 12,
+  },
 ];
 
 function isGameId(value: string | undefined): value is GameId {
@@ -35,6 +42,9 @@ export function NewRoom({ initialGameId }: { initialGameId?: string }) {
   // The game is chosen on the home page; no in-page switcher.
   const gameId: GameId = isGameId(initialGameId) ? initialGameId : GAME_IDS.fiveHundred;
   const game = GAMES.find((g) => g.id === gameId) ?? GAMES[0];
+  // Pubgolf uses a generous fixed pool of seats that fill as people join with
+  // the code (even after the crawl starts), so it skips the exact-count picker.
+  const isPubgolf = gameId === GAME_IDS.pubgolf;
 
   const [name, setName] = useState("");
   const [count, setCount] = useState(2);
@@ -66,7 +76,9 @@ export function NewRoom({ initialGameId }: { initialGameId?: string }) {
         gameId === GAME_IDS.piratbridge
           ? { startingCards, openFinalRound }
           : { jokers, winningScore };
-      const code = await createRoom(count, options, gameId);
+      // Pubgolf: open all 12 seats up front; people join anytime via the code.
+      const createCount = isPubgolf ? game.maxPlayers : count;
+      const code = await createRoom(createCount, options, gameId);
       const { playerID, playerCredentials } = await joinRoom(code, player, avatar, undefined, gameId);
       saveIdentity(code, {
         playerID,
@@ -120,33 +132,53 @@ export function NewRoom({ initialGameId }: { initialGameId?: string }) {
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <p className="text-sm font-semibold text-white">Players</p>
-          <p className="text-xs text-white/50">
-            {game.minPlayers}–{game.maxPlayers} players. Everyone joins with the code.
-          </p>
-          <div className="mt-3 flex items-center justify-center gap-5">
-            <button
-              type="button"
-              onClick={() => setCount((c) => Math.max(game.minPlayers, c - 1))}
-              disabled={count <= game.minPlayers}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-2xl text-white transition hover:bg-white/20 disabled:opacity-30"
-              aria-label="Fewer players"
-            >
-              −
-            </button>
-            <span className="w-12 text-center text-3xl font-bold tabular-nums text-white">
-              {count}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCount((c) => Math.min(game.maxPlayers, c + 1))}
-              disabled={count >= game.maxPlayers}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-2xl text-white transition hover:bg-white/20 disabled:opacity-30"
-              aria-label="More players"
-            >
-              +
-            </button>
-          </div>
+          {isPubgolf ? (
+            <p className="text-xs text-white/50">
+              Up to {game.maxPlayers} players. Everyone joins with the code — even
+              after the crawl has started.
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-white/50">
+                {game.minPlayers}–{game.maxPlayers} players. Everyone joins with the code.
+              </p>
+              <div className="mt-3 flex items-center justify-center gap-5">
+                <button
+                  type="button"
+                  onClick={() => setCount((c) => Math.max(game.minPlayers, c - 1))}
+                  disabled={count <= game.minPlayers}
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-2xl text-white transition hover:bg-white/20 disabled:opacity-30"
+                  aria-label="Fewer players"
+                >
+                  −
+                </button>
+                <span className="w-12 text-center text-3xl font-bold tabular-nums text-white">
+                  {count}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCount((c) => Math.min(game.maxPlayers, c + 1))}
+                  disabled={count >= game.maxPlayers}
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-2xl text-white transition hover:bg-white/20 disabled:opacity-30"
+                  aria-label="More players"
+                >
+                  +
+                </button>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Pubgolf: a ready-made crawl is loaded automatically — nothing to pick */}
+        {isPubgolf && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-sm font-semibold text-white">Crawl</p>
+            <p className="text-xs text-white/50">
+              A ready-made 9-hole crawl is loaded automatically. Rename the bars,
+              add or remove stops, and set the sips — any time, even mid-crawl.
+            </p>
+          </div>
+        )}
 
         {/* 500-specific options */}
         {gameId === GAME_IDS.fiveHundred && (
@@ -267,18 +299,22 @@ export function NewRoom({ initialGameId }: { initialGameId?: string }) {
           {busy ? "Creating…" : "Create room"}
         </button>
 
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-white/10" />
-          <span className="text-xs text-white/40">or</span>
-          <div className="h-px flex-1 bg-white/10" />
-        </div>
+        {!isPubgolf && (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-xs text-white/40">or</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
 
-        <Link
-          href="/play/solo"
-          className="rounded-2xl border border-white/15 bg-white/5 px-6 py-4 text-center text-lg font-bold text-white transition hover:bg-white/10"
-        >
-          Play solo vs bot
-        </Link>
+            <Link
+              href="/play/solo"
+              className="rounded-2xl border border-white/15 bg-white/5 px-6 py-4 text-center text-lg font-bold text-white transition hover:bg-white/10"
+            >
+              Play solo vs bot
+            </Link>
+          </>
+        )}
       </section>
     </main>
   );
