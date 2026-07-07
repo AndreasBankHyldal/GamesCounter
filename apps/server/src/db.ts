@@ -25,7 +25,13 @@ export class PostgresStore extends Async {
     super();
     this.pool =
       typeof arg === "string"
-        ? new Pool({ connectionString: arg, ssl: sslFor(arg) })
+        ? new Pool({
+            connectionString: arg,
+            ssl: sslFor(arg),
+            // Fail fast if the host is unreachable (e.g. an expired free DB)
+            // so startup can fall back to in-memory instead of hanging.
+            connectionTimeoutMillis: 10_000,
+          })
         : arg;
   }
 
