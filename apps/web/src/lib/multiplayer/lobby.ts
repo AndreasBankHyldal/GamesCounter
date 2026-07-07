@@ -61,15 +61,17 @@ export async function createRoom(
     numPlayers,
     unlisted: true,
     setupData:
-      gameId === GAME_IDS.piratbridge
-        ? {
-            startingCards: options?.startingCards,
-            openFinalRound: options?.openFinalRound ?? false,
-          }
-        : {
-            jokers: options?.jokers ?? 2,
-            winningScore: options?.winningScore ?? 500,
-          },
+      gameId === GAME_IDS.pubgolf
+        ? {}
+        : gameId === GAME_IDS.piratbridge
+          ? {
+              startingCards: options?.startingCards,
+              openFinalRound: options?.openFinalRound ?? false,
+            }
+          : {
+              jokers: options?.jokers ?? 2,
+              winningScore: options?.winningScore ?? 500,
+            },
   });
   return matchID;
 }

@@ -17,18 +17,25 @@ interface CleanupOpts {
 }
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
+const EIGHT_HOURS = 8 * 60 * 60 * 1000;
 const ONE_MINUTE = 60 * 1000;
+
+/** Per-game idle grace period. Pubgolf crawls run all night with phones
+ *  locked between pubs, so they need a much longer window than card games. */
+const GRACE_BY_GAME: Record<string, number> = {
+  pubgolf: EIGHT_HOURS,
+};
 
 /**
  * Periodically delete matches where every player is disconnected and there has
- * been no activity for `idleMs`. boardgame.io's SocketIO transport flips
- * `isConnected` per player and bumps `updatedAt` on each action; if a build
+ * been no activity for the game's idle window. boardgame.io's SocketIO transport
+ * flips `isConnected` per player and bumps `updatedAt` on each action; if a build
  * never sets `isConnected`, the idle-time check alone still reaps dead matches.
  * Returns a function that stops the sweep.
  */
 export function startCleanup(rawDb: unknown, opts: CleanupOpts = {}): () => void {
   const db = rawDb as Db;
-  const idleMs = opts.idleMs ?? FIFTEEN_MINUTES;
+  const defaultIdleMs = opts.idleMs ?? FIFTEEN_MINUTES;
   const intervalMs = opts.intervalMs ?? ONE_MINUTE;
 
   const sweep = async () => {
@@ -41,6 +48,7 @@ export function startCleanup(rawDb: unknown, opts: CleanupOpts = {}): () => void
         const anyConnected = players.some((p) => p?.isConnected);
         const lastActivity = metadata.updatedAt ?? metadata.createdAt ?? 0;
         const idleFor = Date.now() - lastActivity;
+        const idleMs = GRACE_BY_GAME[metadata.gameName ?? ""] ?? defaultIdleMs;
         if (!anyConnected && idleFor > idleMs) {
           await Promise.resolve(db.wipe(id));
           console.log(`[cleanup] wiped idle match ${id} (idle ${Math.round(idleFor / 1000)}s)`);

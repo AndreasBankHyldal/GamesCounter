@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FiveHundredClient, PiratbridgeClient } from "@/lib/multiplayer/client";
+import { FiveHundredClient, PiratbridgeClient, PubgolfClient } from "@/lib/multiplayer/client";
 import { loadIdentity, saveIdentity, type Identity } from "@/lib/multiplayer/identity";
 import { GAME_IDS } from "@/lib/multiplayer/config";
 import { getRoom } from "@/lib/multiplayer/lobby";
@@ -62,7 +62,9 @@ export function TableMount({ code }: { code: string }) {
 
   return (
     <div className="felt relative min-h-screen">
-      {identity.gameId === GAME_IDS.piratbridge ? (
+      {identity.gameId === GAME_IDS.pubgolf ? (
+        <PubgolfClient {...sharedProps} />
+      ) : identity.gameId === GAME_IDS.piratbridge ? (
         <PiratbridgeClient {...sharedProps} />
       ) : (
         <FiveHundredClient {...sharedProps} />

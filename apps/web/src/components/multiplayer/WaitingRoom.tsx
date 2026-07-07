@@ -153,7 +153,11 @@ export function WaitingRoom({ code }: { code: string }) {
           </p>
           {room?.gameId && (
             <p className="mb-4 text-center text-sm text-white/50">
-              {room.gameId === "piratbridge" ? "Piratbridge" : "500"}
+              {room.gameId === "pubgolf"
+                ? "Pubgolf"
+                : room.gameId === "piratbridge"
+                  ? "Piratbridge"
+                  : "500"}
             </p>
           )}
           <form onSubmit={joinHere} className="flex flex-col gap-3">
@@ -184,7 +188,11 @@ export function WaitingRoom({ code }: { code: string }) {
   const filled = seats.filter((p) => p.name).length;
   const total = seats.length;
   const isHost = identity.playerID === "0";
-  const canStart = isHost && filled === total && total >= 2;
+  // Pubgolf fills seats over the night — hide empty ones and let the host open
+  // the table as soon as anyone (just themselves) is in; others join later.
+  const isPubgolf = (room?.gameId ?? identity.gameId) === "pubgolf";
+  const displayedSeats = isPubgolf ? seats.filter((p) => p.name) : seats;
+  const canStart = isHost && (isPubgolf ? filled >= 1 : filled === total && total >= 2);
 
   return (
     <main className="felt flex flex-1 flex-col items-center px-5 py-12">
@@ -214,10 +222,10 @@ export function WaitingRoom({ code }: { code: string }) {
         </div>
 
         <h2 className="mb-3 mt-6 text-sm font-semibold uppercase tracking-widest text-white/50">
-          Players ({filled}/{total})
+          Players ({isPubgolf ? filled : `${filled}/${total}`})
         </h2>
         <ul className="flex flex-col gap-2">
-          {seats.map((p) => (
+          {displayedSeats.map((p) => (
             <li
               key={p.id}
               className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
@@ -255,9 +263,11 @@ export function WaitingRoom({ code }: { code: string }) {
             >
               {starting
                 ? "Starting…"
-                : canStart
-                  ? "Start game"
-                  : `Waiting for ${total - filled} more…`}
+                : isPubgolf
+                  ? "Start pubgolf"
+                  : canStart
+                    ? "Start game"
+                    : `Waiting for ${total - filled} more…`}
             </button>
           ) : (
             <p className="text-center text-sm text-white/60">
