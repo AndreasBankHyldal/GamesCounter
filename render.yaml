@@ -1,10 +1,11 @@
 # Render Blueprint for the boardgame.io game server (apps/server).
 # In Render: New > Blueprint, point it at this repo, and it reads this file.
 # The web app (apps/web) is deployed separately on Vercel, not here.
-databases:
-  # Persistent match storage so games survive restarts / spin-downs.
-  - name: gamescounter-db
-    plan: free
+#
+# Persistent match storage is provided by an external, always-free Neon Postgres.
+# DATABASE_URL is set manually in the Render dashboard (see envVars below) rather
+# than bound to a Render-managed database, because Render's free internal Postgres
+# is deleted after ~30 days.
 
 services:
   - type: web
@@ -21,6 +22,4 @@ services:
       - key: CLIENT_ORIGIN
         sync: false # set this to your Vercel URL in the dashboard after deploy
       - key: DATABASE_URL
-        fromDatabase:
-          name: gamescounter-db
-          property: connectionString
+        sync: false # set to the external Neon Postgres URI in the dashboard
