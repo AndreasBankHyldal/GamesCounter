@@ -266,7 +266,58 @@ export function TableChat({
 
       {/* Chat panel. */}
       {open && (
-        <div className="fixed bottom-20 right-4 z-40 flex max-h-[60vh] w-[min(90vw,20rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-neutral-900/95 text-white shadow-2xl backdrop-blur">
+        <div className="fixed bottom-20 right-4 z-40 flex max-h-[72vh] w-[min(92vw,24rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-neutral-900/95 text-white shadow-2xl backdrop-blur">
+          {gifOpen && gifConfigured && (
+            <div className="absolute inset-0 z-30 flex flex-col bg-neutral-900">
+              <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+                <input
+                  value={gifQuery}
+                  onChange={(e) => setGifQuery(e.target.value)}
+                  placeholder="Search GIFs…"
+                  aria-label="Search GIFs"
+                  autoFocus
+                  className="min-w-0 flex-1 rounded-full bg-white/10 px-3 py-1.5 text-sm outline-none placeholder:text-white/40 focus:bg-white/15"
+                />
+                <button
+                  type="button"
+                  onClick={() => setGifOpen(false)}
+                  aria-label="Close GIF picker"
+                  className="shrink-0 rounded-full px-2 text-lg leading-none text-white/70 hover:text-white"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {gifResults.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => sendGif(g)}
+                      aria-label={`Send ${g.alt}`}
+                      className="overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10 transition hover:ring-2 hover:ring-emerald-400/70"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- remote GIF thumbnail from provider */}
+                      <img
+                        src={g.preview || g.url}
+                        alt={g.alt}
+                        loading="lazy"
+                        className="h-36 w-full object-contain"
+                      />
+                    </button>
+                  ))}
+                </div>
+                {!gifLoading && gifResults.length === 0 && (
+                  <p className="mt-6 text-center text-xs text-white/40">
+                    {gifQuery.trim() ? "No GIFs found." : "Loading trending…"}
+                  </p>
+                )}
+              </div>
+              <p className="border-t border-white/10 py-1 text-center text-[9px] uppercase tracking-wide text-white/30">
+                {gifLoading ? "Searching…" : "Powered by Klipy"}
+              </p>
+            </div>
+          )}
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
             <span className="text-sm font-semibold">Table chat</span>
             <button
@@ -304,44 +355,6 @@ export function TableChat({
                       {emoji}
                     </button>
                   ))}
-                </div>
-              )}
-              {gifOpen && gifConfigured && (
-                <div className="absolute bottom-full left-0 z-10 mb-2 flex h-[40vh] w-full flex-col rounded-xl border border-white/15 bg-neutral-800 p-2 shadow-xl">
-                  <input
-                    value={gifQuery}
-                    onChange={(e) => setGifQuery(e.target.value)}
-                    placeholder="Search GIFs…"
-                    aria-label="Search GIFs"
-                    className="mb-2 rounded-full bg-white/10 px-3 py-1.5 text-sm outline-none placeholder:text-white/40 focus:bg-white/15"
-                  />
-                  <div className="grid flex-1 grid-cols-2 gap-1 overflow-y-auto">
-                    {gifResults.map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => sendGif(g)}
-                        aria-label={`Send ${g.alt}`}
-                        className="overflow-hidden rounded-lg bg-white/5 transition hover:opacity-80"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- remote GIF thumbnail from provider */}
-                        <img
-                          src={g.preview || g.url}
-                          alt={g.alt}
-                          loading="lazy"
-                          className="h-24 w-full object-cover"
-                        />
-                      </button>
-                    ))}
-                    {!gifLoading && gifResults.length === 0 && (
-                      <p className="col-span-2 mt-4 text-center text-xs text-white/40">
-                        {gifQuery.trim() ? "No GIFs found." : "Loading trending…"}
-                      </p>
-                    )}
-                  </div>
-                  <p className="mt-1 text-center text-[9px] uppercase tracking-wide text-white/30">
-                    {gifLoading ? "Searching…" : "Powered by Klipy"}
-                  </p>
                 </div>
               )}
               <button
