@@ -453,7 +453,7 @@ export function FiveHundredBoard({
   const canDraw = myTurn && !G.hasDrawn && !paused;
 
   return (
-    <div className="felt relative flex min-h-screen flex-col gap-4 px-4 pb-8 pt-3 text-white">
+    <div className="felt relative flex min-h-dvh flex-col gap-4 overflow-x-hidden px-4 pb-8 pt-3 text-white">
       {/* Status bar. The right side stacks the Leave button above the
           connection indicator so they never overlap. */}
       <div className="flex items-start justify-between text-sm">
@@ -789,7 +789,7 @@ export function FiveHundredBoard({
                   </span>
                   <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
                     {suitMelds.map((meld) => (
-                      <div key={meld.id} className="flex items-start gap-1">
+                      <div key={meld.id} className="flex flex-wrap items-start gap-1">
                         {meld.cards.map((placed, idx) => (
                           <div key={idx} className="flex w-11 flex-col items-center">
                             {placed.card.isJoker ? (

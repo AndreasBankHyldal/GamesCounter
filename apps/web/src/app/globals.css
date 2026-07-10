@@ -29,6 +29,9 @@
 html,
 body {
   height: 100%;
+  /* Fallback green so horizontal overflow / mobile overscroll never flashes
+     white — matches the felt edge and the browser theme-color. */
+  background-color: var(--felt-edge);
 }
 
 body {

@@ -110,10 +110,11 @@ export function TableChat({
     }
   }, [open, messages.length]);
 
-  // Focus the input when the panel opens; close the pickers when it closes.
+  // Close the pickers when the panel closes. We intentionally do NOT autofocus
+  // the input on open — focusing it forces the mobile keyboard up before the
+  // player has tapped the message bar. The keyboard now only appears on tap.
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-    else {
+    if (!open) {
       setEmojiOpen(false);
       setGifOpen(false);
     }
