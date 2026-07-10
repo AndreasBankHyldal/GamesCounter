@@ -266,7 +266,7 @@ export function TableChat({
 
       {/* Chat panel. */}
       {open && (
-        <div className="fixed bottom-20 right-4 z-40 flex max-h-[72vh] w-[min(92vw,24rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-neutral-900/95 text-white shadow-2xl backdrop-blur">
+        <div className="fixed bottom-20 right-4 z-40 flex h-[70vh] w-[min(94vw,28rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-neutral-900/95 text-white shadow-2xl backdrop-blur">
           {gifOpen && gifConfigured && (
             <div className="absolute inset-0 z-30 flex flex-col bg-neutral-900">
               <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
