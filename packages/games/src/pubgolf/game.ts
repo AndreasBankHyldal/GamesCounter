@@ -47,6 +47,16 @@ function trimmed(value: unknown): string | undefined {
 }
 
 /**
+ * Normalise a par value: a non-negative integer, or `undefined` when unset/0
+ * (par 0 means "no par", so points equal sips). Rejects negatives/NaN.
+ */
+function parValue(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  const n = Math.floor(value);
+  return n > 0 ? n : undefined;
+}
+
+/**
  * Turn a list of preset stops into concrete `Stop`s with ids/order, seeding a
  * fresh score bucket for each bar. Returns the next free sequence number so
  * callers keep minting unique ids afterwards.
@@ -69,6 +79,8 @@ function seedStops(
     if (s.type === "bar") {
       if (s.drink) stop.drink = s.drink;
       if (s.challenge) stop.challenge = s.challenge;
+      const par = parValue(s.par);
+      if (par !== undefined) stop.par = par;
     }
     if (s.isPeeHole) stop.isPeeHole = true;
     if (s.note) stop.note = s.note;
@@ -84,6 +96,7 @@ interface AddStopInput {
   type: StopType;
   name: string;
   drink?: string;
+  par?: number;
   challenge?: string;
   note?: string;
   isPeeHole?: boolean;
@@ -98,6 +111,8 @@ const addStop: MoveFn<PubgolfState> = ({ G }, input: AddStopInput) => {
   if (type === "bar") {
     const drink = trimmed(input.drink);
     if (drink) stop.drink = drink;
+    const par = parValue(input.par);
+    if (par !== undefined) stop.par = par;
     const challenge = trimmed(input.challenge);
     if (challenge) stop.challenge = challenge;
     if (input.isPeeHole) stop.isPeeHole = true;
@@ -122,6 +137,7 @@ const updateStop: MoveFn<PubgolfState> = ({ G }, id: string, patch: StopPatch) =
   }
   if (patch.type !== undefined && STOP_TYPES.includes(patch.type)) stop.type = patch.type;
   if ("drink" in patch) stop.drink = trimmed(patch.drink);
+  if ("par" in patch) stop.par = parValue(patch.par);
   if ("challenge" in patch) stop.challenge = trimmed(patch.challenge);
   if ("note" in patch) stop.note = trimmed(patch.note);
   if ("isPeeHole" in patch) stop.isPeeHole = patch.isPeeHole ? true : undefined;

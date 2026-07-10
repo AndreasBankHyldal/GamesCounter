@@ -337,6 +337,7 @@ function CourseTab({
   const [type, setType] = useState<StopType>("bar");
   const [name, setName] = useState("");
   const [drink, setDrink] = useState("");
+  const [par, setPar] = useState(0);
   const [challenge, setChallenge] = useState("");
   const [isPeeHole, setIsPeeHole] = useState(false);
 
@@ -349,6 +350,7 @@ function CourseTab({
       ...(type === "bar"
         ? {
             drink: drink.trim() || undefined,
+            par: par > 0 ? par : undefined,
             challenge: challenge.trim() || undefined,
             isPeeHole: isPeeHole || undefined,
           }
@@ -356,6 +358,7 @@ function CourseTab({
     });
     setName("");
     setDrink("");
+    setPar(0);
     setChallenge("");
     setIsPeeHole(false);
   }
@@ -406,6 +409,16 @@ function CourseTab({
               maxLength={30}
               className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/30"
             />
+            <label className="flex items-center justify-between text-sm text-white">
+              <span>⛳ Par {par === 0 && <span className="text-white/40">(none)</span>}</span>
+              <Stepper
+                value={par}
+                dim={par === 0}
+                onDec={() => setPar((v) => Math.max(0, v - 1))}
+                onInc={() => setPar((v) => v + 1)}
+                label="Par"
+              />
+            </label>
             <input
               value={challenge}
               onChange={(e) => setChallenge(e.target.value)}
@@ -479,6 +492,11 @@ function CourseTab({
                         PEE
                       </span>
                     )}
+                    {stop.type === "bar" && typeof stop.par === "number" && (
+                      <span className="ml-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-200">
+                        PAR {stop.par}
+                      </span>
+                    )}
                   </p>
                   {stop.type === "bar" && stop.challenge && (
                     <p className="truncate text-xs text-white/50">{stop.challenge}</p>
@@ -514,6 +532,22 @@ function CourseTab({
                   </button>
                 </div>
               </div>
+              {stop.type === "bar" && (
+                <div className="mt-2 flex items-center justify-between rounded-lg bg-white/5 px-3 py-1.5">
+                  <span className="text-xs font-semibold text-white/50">
+                    ⛳ Par {typeof stop.par !== "number" && <span className="text-white/30">(none)</span>}
+                  </span>
+                  <Stepper
+                    value={stop.par ?? 0}
+                    dim={typeof stop.par !== "number"}
+                    onDec={() =>
+                      moves.updateStop(stop.id, { par: Math.max(0, (stop.par ?? 0) - 1) })
+                    }
+                    onInc={() => moves.updateStop(stop.id, { par: (stop.par ?? 0) + 1 })}
+                    label="Par"
+                  />
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => moves.setCurrentStop(isCurrent ? null : stop.id)}
@@ -645,6 +679,11 @@ function ScoresTab({
                   PEE
                 </span>
               )}
+              {typeof selected.par === "number" && (
+                <span className="ml-1 rounded bg-emerald-500/20 px-1.5 py-0.5 align-middle text-[10px] font-bold text-emerald-200">
+                  PAR {selected.par}
+                </span>
+              )}
             </span>
           </div>
           {selected.challenge && (
@@ -657,7 +696,7 @@ function ScoresTab({
               const hasSips = typeof cell.sips === "number";
               const sips = hasSips ? (cell.sips as number) : 0;
               const chal = cell.challengeDelta ?? 0;
-              const holePts = sips + chal;
+              const holePts = (hasSips ? sips - (selected.par ?? 0) : 0) + chal;
               const hasScore = hasSips || chal !== 0;
               const av = avatarFor(p.id);
               return (
@@ -1121,18 +1160,25 @@ function ResultsOverlay({
     lines.push("COURSE & SCORES");
     G.stops.forEach((stop, i) => {
       const meta = STOP_META[stop.type];
-      const extras = [stop.drink, stop.challenge, stop.note].filter(Boolean).join(", ");
+      const extras = [stop.drink, typeof stop.par === "number" ? `par ${stop.par}` : undefined, stop.challenge, stop.note]
+        .filter(Boolean)
+        .join(", ");
       lines.push(`${i + 1}. ${meta.icon} ${stop.name}${extras ? ` (${extras})` : ""}`);
       if (stop.type === "bar") {
         standings.forEach((s) => {
           const cell = G.scores[stop.id]?.[s.playerID];
           if (!cell) return;
           const parts: string[] = [];
-          if (typeof cell.sips === "number") parts.push(`${cell.sips} sips`);
+          if (typeof cell.sips === "number") {
+            parts.push(`${cell.sips} sips`);
+            if (typeof stop.par === "number") parts.push(`par ${stop.par}`);
+          }
           if (typeof cell.challengeDelta === "number")
             parts.push(`challenge ${fmt(cell.challengeDelta)}`);
           if (parts.length === 0) return;
-          const total = (cell.sips ?? 0) + (cell.challengeDelta ?? 0);
+          const total =
+            (typeof cell.sips === "number" ? cell.sips - (stop.par ?? 0) : 0) +
+            (cell.challengeDelta ?? 0);
           lines.push(`     ${nameFor(s.playerID)}: ${parts.join(", ")} = ${total} pts`);
         });
       }
