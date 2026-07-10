@@ -3,7 +3,7 @@ import type { PlayerID, PubgolfState } from "./types";
 /** A player's computed golf standing for the night. Lower `total` is better. */
 export interface Standing {
   playerID: PlayerID;
-  /** Sum over played bars of the sips taken (sips are the points). */
+  /** Sum over played bars of `sips - par` (a hole's par defaults to 0). */
   holeTotal: number;
   /** Sum of challenge adjustments. */
   challengeTotal: number;
@@ -27,7 +27,7 @@ export function computeStanding(G: PubgolfState, playerID: PlayerID): Standing {
     const cell = G.scores[stop.id]?.[playerID];
     if (!cell) continue;
     if (typeof cell.sips === "number") {
-      holeTotal += cell.sips;
+      holeTotal += cell.sips - (stop.par ?? 0);
       holesPlayed += 1;
     }
     if (typeof cell.challengeDelta === "number") {

@@ -12,6 +12,12 @@ export interface Stop {
   order: number;
   /** What you drink at this hole, e.g. "Øl", "Shots", "Drink" (bars only). */
   drink?: string;
+  /**
+   * Par for this hole — the target number of sips (bars only). A played hole
+   * scores `sips - par`, so par 3 + 3 sips = 0, +2 = -1, +4 = +1. Defaults to 0
+   * when unset (points then equal sips).
+   */
+  par?: number;
   /** Challenge description for this bar (bars only). */
   challenge?: string;
   /** Free-form note (any stop). */

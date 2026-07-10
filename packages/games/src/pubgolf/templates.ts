@@ -6,8 +6,9 @@ export type PresetStop = Omit<Stop, "id" | "order">;
 /**
  * The single built-in pub crawl, seeded into every game. Rename the bars,
  * add/remove/reorder stops and set the sips at any time — even after the game
- * has started. There is no par: the sips you take at each bar are your points,
- * and the lowest total wins. Holes 3, 6 and 9 are the designated pee holes.
+ * has started. Each bar has a par (defaults to 0 when unset): a played hole
+ * scores `sips - par`, and the lowest total wins. Holes 3, 6 and 9 are the
+ * designated pee holes.
  */
 export const DEFAULT_CRAWL: PresetStop[] = [
   { type: "bar", name: "Vinstuen", drink: "Øl", challenge: "Drik med din ikke-dominante hånd" },
