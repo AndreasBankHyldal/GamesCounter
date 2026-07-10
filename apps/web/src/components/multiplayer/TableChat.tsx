@@ -12,6 +12,13 @@ type ChatPayload = { text: string };
 
 const MAX_LEN = 300;
 
+// A compact set of common reactions for the quick emoji picker.
+const EMOJIS = [
+  "😀", "😂", "😍", "😎", "🤔", "😅", "😭", "😡",
+  "👍", "👎", "👏", "🙏", "🔥", "🎉", "❤️", "💔",
+  "🃏", "♠️", "♥️", "♦️", "♣️", "🏆", "😴", "🤝",
+];
+
 function textOf(msg: ChatMessage): string {
   const payload = msg.payload as Partial<ChatPayload> | string | undefined;
   if (typeof payload === "string") return payload;
@@ -43,6 +50,7 @@ export function TableChat({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   // How many messages the player has already seen (drives the unread badge).
   const [seen, setSeen] = useState(messages.length);
   const listRef = useRef<HTMLDivElement>(null);
@@ -68,9 +76,10 @@ export function TableChat({
     }
   }, [open, messages.length]);
 
-  // Focus the input when the panel opens.
+  // Focus the input when the panel opens; close the emoji picker when it closes.
   useEffect(() => {
     if (open) inputRef.current?.focus();
+    else setEmojiOpen(false);
   }, [open]);
 
   function send() {
@@ -78,6 +87,24 @@ export function TableChat({
     if (!text) return;
     onSend({ text });
     setDraft("");
+    setEmojiOpen(false);
+  }
+
+  // Insert an emoji at the caret (or append), keeping within the length cap and
+  // returning focus to the input so the player can keep typing.
+  function insertEmoji(emoji: string) {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? draft.length;
+    const end = input?.selectionEnd ?? draft.length;
+    const next = (draft.slice(0, start) + emoji + draft.slice(end)).slice(0, MAX_LEN);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      const caret = Math.min(start + emoji.length, next.length);
+      el.setSelectionRange(caret, caret);
+    });
   }
 
   const rows = useMemo(
@@ -152,7 +179,33 @@ export function TableChat({
           </div>
 
           <div className="border-t border-white/10 px-2 py-2">
-            <div className="flex items-end gap-2">
+            <div className="relative flex items-end gap-2">
+              {emojiOpen && (
+                <div className="absolute bottom-full left-0 z-10 mb-2 grid w-full grid-cols-8 gap-1 rounded-xl border border-white/15 bg-neutral-800 p-2 shadow-xl">
+                  {EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => insertEmoji(emoji)}
+                      aria-label={`Insert ${emoji}`}
+                      className="rounded-lg py-1 text-lg leading-none hover:bg-white/15"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setEmojiOpen((v) => !v)}
+                aria-label={emojiOpen ? "Hide emojis" : "Add emoji"}
+                aria-expanded={emojiOpen}
+                className={`shrink-0 rounded-full px-2 py-2 text-lg leading-none ${
+                  emojiOpen ? "bg-white/20" : "bg-white/10 hover:bg-white/15"
+                }`}
+              >
+                🙂
+              </button>
               <input
                 ref={inputRef}
                 value={draft}
