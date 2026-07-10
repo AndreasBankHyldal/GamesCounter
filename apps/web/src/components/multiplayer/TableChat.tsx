@@ -7,8 +7,26 @@ import { playChat } from "@/lib/multiplayer/sound";
 
 type AvatarInfo = { styleKey: string; seed: string };
 
-/** Payload shape we send/receive over boardgame.io's chat channel. */
-type ChatPayload = { text: string };
+/** A GIF chosen from the picker (normalized by /api/gifs). */
+interface GifResult {
+  id: string;
+  url: string;
+  preview: string;
+  width?: number;
+  height?: number;
+  alt: string;
+}
+
+/** Payload shapes we send/receive over boardgame.io's chat channel. */
+type GifPayload = {
+  type: "gif";
+  url: string;
+  preview?: string;
+  width?: number;
+  height?: number;
+  alt?: string;
+};
+type ChatPayload = { text: string } | GifPayload;
 
 const MAX_LEN = 300;
 
@@ -20,9 +38,19 @@ const EMOJIS = [
 ];
 
 function textOf(msg: ChatMessage): string {
-  const payload = msg.payload as Partial<ChatPayload> | string | undefined;
+  const payload = msg.payload as Partial<{ text: string }> | string | undefined;
   if (typeof payload === "string") return payload;
   return typeof payload?.text === "string" ? payload.text : "";
+}
+
+/** Returns the GIF payload if this message is a GIF, else null. */
+function gifOf(msg: ChatMessage): GifPayload | null {
+  const p = msg.payload;
+  if (p && typeof p === "object" && (p as { type?: unknown }).type === "gif") {
+    const g = p as GifPayload;
+    if (typeof g.url === "string" && g.url) return g;
+  }
+  return null;
 }
 
 /**
@@ -51,6 +79,12 @@ export function TableChat({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [gifOpen, setGifOpen] = useState(false);
+  // null = not yet checked; false = no KLIPY_API_KEY (hide the GIF button).
+  const [gifConfigured, setGifConfigured] = useState<boolean | null>(null);
+  const [gifQuery, setGifQuery] = useState("");
+  const [gifResults, setGifResults] = useState<GifResult[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
   // How many messages the player has already seen (drives the unread badge).
   const [seen, setSeen] = useState(messages.length);
   const listRef = useRef<HTMLDivElement>(null);
@@ -76,11 +110,58 @@ export function TableChat({
     }
   }, [open, messages.length]);
 
-  // Focus the input when the panel opens; close the emoji picker when it closes.
+  // Focus the input when the panel opens; close the pickers when it closes.
   useEffect(() => {
     if (open) inputRef.current?.focus();
-    else setEmojiOpen(false);
+    else {
+      setEmojiOpen(false);
+      setGifOpen(false);
+    }
   }, [open]);
+
+  // Feature-detect the GIF provider (and prime trending) the first time the
+  // chat opens. If /api/gifs reports it's not configured, the button stays hidden.
+  useEffect(() => {
+    if (!open || gifConfigured !== null) return;
+    let cancelled = false;
+    fetch("/api/gifs")
+      .then((r) => r.json())
+      .then((d: { configured?: boolean; results?: GifResult[] }) => {
+        if (cancelled) return;
+        setGifConfigured(Boolean(d.configured));
+        if (d.configured && Array.isArray(d.results)) setGifResults(d.results);
+      })
+      .catch(() => {
+        if (!cancelled) setGifConfigured(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, gifConfigured]);
+
+  // Debounced GIF search (empty query -> trending), while the GIF panel is open.
+  useEffect(() => {
+    if (!gifOpen || gifConfigured === false) return;
+    const q = gifQuery.trim();
+    const ctrl = new AbortController();
+    setGifLoading(true);
+    const t = setTimeout(
+      () => {
+        fetch(`/api/gifs?q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
+          .then((r) => r.json())
+          .then((d: { results?: GifResult[] }) => {
+            setGifResults(Array.isArray(d.results) ? d.results : []);
+          })
+          .catch(() => {})
+          .finally(() => setGifLoading(false));
+      },
+      q ? 350 : 0
+    );
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [gifQuery, gifOpen, gifConfigured]);
 
   function send() {
     const text = draft.trim().slice(0, MAX_LEN);
@@ -88,6 +169,18 @@ export function TableChat({
     onSend({ text });
     setDraft("");
     setEmojiOpen(false);
+  }
+
+  function sendGif(g: GifResult) {
+    onSend({
+      type: "gif",
+      url: g.url,
+      preview: g.preview,
+      width: g.width,
+      height: g.height,
+      alt: g.alt,
+    });
+    setGifOpen(false);
   }
 
   // Insert an emoji at the caret (or append), keeping within the length cap and
@@ -112,6 +205,7 @@ export function TableChat({
       messages.map((m, i) => {
         const sender = String(m.sender);
         const mine = sender === me;
+        const gif = gifOf(m);
         return (
           <li
             key={m.id ?? i}
@@ -122,13 +216,30 @@ export function TableChat({
               <div className="text-[11px] font-semibold text-white/60">
                 {mine ? "You" : nameFor(sender)}
               </div>
-              <div
-                className={`inline-block max-w-[14rem] break-words rounded-2xl px-3 py-1.5 text-sm ${
-                  mine ? "bg-emerald-500/80 text-black" : "bg-white/15 text-white"
-                }`}
-              >
-                {textOf(m)}
-              </div>
+              {gif ? (
+                <a
+                  href={gif.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block overflow-hidden rounded-2xl"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- remote GIF from provider; next/image would need domain config */}
+                  <img
+                    src={gif.preview || gif.url}
+                    alt={gif.alt || "GIF"}
+                    loading="lazy"
+                    className="max-h-48 max-w-[12rem] rounded-2xl"
+                  />
+                </a>
+              ) : (
+                <div
+                  className={`inline-block max-w-[14rem] break-words rounded-2xl px-3 py-1.5 text-sm ${
+                    mine ? "bg-emerald-500/80 text-black" : "bg-white/15 text-white"
+                  }`}
+                >
+                  {textOf(m)}
+                </div>
+              )}
             </div>
           </li>
         );
@@ -195,9 +306,50 @@ export function TableChat({
                   ))}
                 </div>
               )}
+              {gifOpen && gifConfigured && (
+                <div className="absolute bottom-full left-0 z-10 mb-2 flex h-[40vh] w-full flex-col rounded-xl border border-white/15 bg-neutral-800 p-2 shadow-xl">
+                  <input
+                    value={gifQuery}
+                    onChange={(e) => setGifQuery(e.target.value)}
+                    placeholder="Search GIFs…"
+                    aria-label="Search GIFs"
+                    className="mb-2 rounded-full bg-white/10 px-3 py-1.5 text-sm outline-none placeholder:text-white/40 focus:bg-white/15"
+                  />
+                  <div className="grid flex-1 grid-cols-2 gap-1 overflow-y-auto">
+                    {gifResults.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => sendGif(g)}
+                        aria-label={`Send ${g.alt}`}
+                        className="overflow-hidden rounded-lg bg-white/5 transition hover:opacity-80"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- remote GIF thumbnail from provider */}
+                        <img
+                          src={g.preview || g.url}
+                          alt={g.alt}
+                          loading="lazy"
+                          className="h-24 w-full object-cover"
+                        />
+                      </button>
+                    ))}
+                    {!gifLoading && gifResults.length === 0 && (
+                      <p className="col-span-2 mt-4 text-center text-xs text-white/40">
+                        {gifQuery.trim() ? "No GIFs found." : "Loading trending…"}
+                      </p>
+                    )}
+                  </div>
+                  <p className="mt-1 text-center text-[9px] uppercase tracking-wide text-white/30">
+                    {gifLoading ? "Searching…" : "Powered by Klipy"}
+                  </p>
+                </div>
+              )}
               <button
                 type="button"
-                onClick={() => setEmojiOpen((v) => !v)}
+                onClick={() => {
+                  setEmojiOpen((v) => !v);
+                  setGifOpen(false);
+                }}
                 aria-label={emojiOpen ? "Hide emojis" : "Add emoji"}
                 aria-expanded={emojiOpen}
                 className={`shrink-0 rounded-full px-2 py-2 text-lg leading-none ${
@@ -206,6 +358,22 @@ export function TableChat({
               >
                 🙂
               </button>
+              {gifConfigured !== false && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGifOpen((v) => !v);
+                    setEmojiOpen(false);
+                  }}
+                  aria-label={gifOpen ? "Hide GIFs" : "Add GIF"}
+                  aria-expanded={gifOpen}
+                  className={`shrink-0 rounded-full px-2.5 py-2 text-xs font-bold leading-none tracking-wide ${
+                    gifOpen ? "bg-white/20" : "bg-white/10 hover:bg-white/15"
+                  }`}
+                >
+                  GIF
+                </button>
+              )}
               <input
                 ref={inputRef}
                 value={draft}
