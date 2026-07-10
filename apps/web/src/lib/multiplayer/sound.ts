@@ -103,3 +103,10 @@ export const playWin = () =>
     { freq: 783.99, at: 0.24 },
     { freq: 1046.5, at: 0.36, dur: 0.4 },
   ]);
+
+/** Incoming chat message — soft two-note blip. */
+export const playChat = () =>
+  play([
+    { freq: 587.33, dur: 0.07, type: "sine", gain: 0.1 },
+    { freq: 880, at: 0.06, dur: 0.09, type: "sine", gain: 0.1 },
+  ]);

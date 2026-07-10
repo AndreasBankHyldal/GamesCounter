@@ -20,6 +20,7 @@ import {
   type Suit,
 } from "@gamescounter/games";
 import { Avatar } from "@/components/Avatar";
+import { TableChat } from "@/components/multiplayer/TableChat";
 import { createRoom, getRoom, joinRoom, updatePlayerData, type RoomInfo } from "@/lib/multiplayer/lobby";
 import { clearIdentity, loadIdentity, saveIdentity } from "@/lib/multiplayer/identity";
 import {
@@ -119,6 +120,8 @@ export function FiveHundredBoard({
   matchID,
   matchData,
   isConnected,
+  sendChatMessage,
+  chatMessages,
 }: Props) {
   const router = useRouter();
   const me = playerID ?? "0";
@@ -983,6 +986,17 @@ export function FiveHundredBoard({
           ))}
         </ul>
       </details>
+
+      {matchID !== "solo" && sendChatMessage && (
+        <TableChat
+          messages={chatMessages ?? []}
+          onSend={sendChatMessage}
+          me={me}
+          nameFor={nameFor}
+          avatars={avatars}
+          soundOn={soundOn}
+        />
+      )}
     </div>
   );
 }

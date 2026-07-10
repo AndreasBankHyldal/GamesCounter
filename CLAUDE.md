@@ -42,7 +42,7 @@ npm run lint && npm run build:web
 
 ## Deploy
 
-- **Vercel** (web): Root Directory = `apps/web`; env `NEXT_PUBLIC_SERVER_URL` = the Render URL.
+- **Vercel** (web): Root Directory = `apps/web`; env `NEXT_PUBLIC_SERVER_URL` = the Render URL. Optional `KLIPY_API_KEY` (server-side, from klipy.com/dev) enables the in-game chat GIF picker via `apps/web/src/app/api/gifs`; without it the GIF button is hidden.
 - **Render** (server): Root Directory = _blank_ (repo root, for workspace resolution); Build `npm install --legacy-peer-deps`; Start `npm run start:server`; env `DATABASE_URL` (Postgres) + optional `CLIENT_ORIGIN`. See `render.yaml`.
 
 ## Gotchas / conventions
