@@ -21,6 +21,16 @@ function sslFor(connectionString: string): pg.PoolConfig["ssl"] {
 export class PostgresStore extends Async {
   private pool: pg.Pool;
 
+  /**
+   * Fired after any *mutating* call (createMatch/setState/setMetadata/wipe).
+   * Deliberately not fired by read-only calls (fetch/listMatches) so that
+   * cleanup's own polling can't keep itself perpetually "active" — see
+   * cleanup.ts, which uses this to wake back up from its dormant/no-timer
+   * state instead of polling Postgres on a permanent interval (that used to
+   * defeat Neon's free-tier autosuspend and burn compute hours 24/7).
+   */
+  onWrite: (() => void) | null = null;
+
   constructor(arg: string | pg.Pool) {
     super();
     this.pool =
@@ -82,6 +92,7 @@ export class PostgresStore extends Async {
         m.updatedAt ?? Date.now(),
       ]
     );
+    this.onWrite?.();
   }
 
   async setState(
@@ -106,6 +117,7 @@ export class PostgresStore extends Async {
         [matchID, JSON.stringify(state), Date.now()]
       );
     }
+    this.onWrite?.();
   }
 
   async setMetadata(matchID: string, metadata: Server.MatchData): Promise<void> {
@@ -121,6 +133,7 @@ export class PostgresStore extends Async {
         metadata.updatedAt ?? Date.now(),
       ]
     );
+    this.onWrite?.();
   }
 
   async fetch<O extends StorageAPI.FetchOpts>(
@@ -152,6 +165,7 @@ export class PostgresStore extends Async {
 
   async wipe(matchID: string): Promise<void> {
     await this.pool.query(`DELETE FROM bgio_matches WHERE id = $1`, [matchID]);
+    this.onWrite?.();
   }
 
   async listMatches(opts?: StorageAPI.ListMatchesOpts): Promise<string[]> {
