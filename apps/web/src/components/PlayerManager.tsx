@@ -76,6 +76,11 @@ export function PlayerManager({
               autoFocus={player.id === lastAddedId}
               onChange={(e) => updatePlayer(player.id, { name: e.target.value })}
               placeholder="Name"
+              name="display-name"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
+              data-form-type="other"
               className="min-w-0 flex-1 bg-transparent text-lg font-medium text-white placeholder:text-white/40 focus:outline-none"
             />
             <button

@@ -58,6 +58,11 @@ export function JoinForm() {
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
           maxLength={20}
+          name="display-name"
+          autoComplete="off"
+          data-1p-ignore
+          data-lpignore="true"
+          data-form-type="other"
           className="flex-1 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-white placeholder:text-white/30"
         />
       </div>

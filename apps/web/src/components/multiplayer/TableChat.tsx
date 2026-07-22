@@ -264,9 +264,19 @@ export function TableChat({
         )}
       </button>
 
+      {/* Backdrop: catches touches so the board behind can't be scrolled/tapped
+          while the chat is open, and closes the panel when tapped. */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          aria-hidden
+          className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[1px] sm:bg-transparent sm:backdrop-blur-0"
+        />
+      )}
+
       {/* Chat panel. */}
       {open && (
-        <div className="fixed bottom-20 right-4 z-40 flex h-[70vh] w-[min(94vw,28rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-neutral-900/95 text-white shadow-2xl backdrop-blur">
+        <div className="fixed inset-x-2 bottom-20 z-40 mx-auto flex h-[70vh] max-h-[calc(100dvh-6rem)] w-auto max-w-[28rem] flex-col overflow-hidden rounded-2xl border border-white/15 bg-neutral-900/95 text-white shadow-2xl backdrop-blur sm:inset-x-auto sm:right-4">
           {gifOpen && gifConfigured && (
             <div className="absolute inset-0 z-30 flex flex-col bg-neutral-900">
               <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
@@ -276,6 +286,12 @@ export function TableChat({
                   placeholder="Search GIFs…"
                   aria-label="Search GIFs"
                   autoFocus
+                  name="gif-search"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
                   className="min-w-0 flex-1 rounded-full bg-white/10 px-3 py-1.5 text-sm outline-none placeholder:text-white/40 focus:bg-white/15"
                 />
                 <button
@@ -287,7 +303,7 @@ export function TableChat({
                   ×
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-2">
+              <div className="flex-1 touch-pan-y overflow-y-auto overscroll-contain p-2">
                 <div className="grid grid-cols-2 gap-2">
                   {gifResults.map((g) => (
                     <button
@@ -330,7 +346,7 @@ export function TableChat({
             </button>
           </div>
 
-          <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-2">
+          <div ref={listRef} className="flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 py-2">
             {messages.length === 0 ? (
               <p className="mt-4 text-center text-xs text-white/40">
                 No messages yet. Say hello! 👋
@@ -400,6 +416,12 @@ export function TableChat({
                 maxLength={MAX_LEN}
                 placeholder="Message…"
                 aria-label="Chat message"
+                name="table-chat-message"
+                autoComplete="off"
+                autoCorrect="off"
+                data-1p-ignore
+                data-lpignore="true"
+                data-form-type="other"
                 className="min-w-0 flex-1 rounded-full bg-white/10 px-3 py-2 text-sm outline-none placeholder:text-white/40 focus:bg-white/15"
               />
               <button
