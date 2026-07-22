@@ -62,7 +62,10 @@ async function main() {
   });
 
   // Auto-delete matches once everyone has been gone for the game's idle window.
-  startCleanup(server.db);
+  // activityGated: only Postgres (db truthy) implements the onWrite hook that
+  // lets the sweep safely go dormant between matches, saving Neon compute
+  // hours; the in-memory dev fallback keeps the old always-on polling.
+  startCleanup(server.db, { activityGated: !!db });
 
   // Keep the Render free instance awake during play (no-op off Render).
   startKeepAlive();
