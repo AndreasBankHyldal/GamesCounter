@@ -74,11 +74,20 @@ export function gabongHundredHits(
 /** Default target for a 500 game when a session predates the slider. */
 export const DEFAULT_WINNING_SCORE = 500;
 
+/** Default losing limit for Jona's spil. */
+export const DEFAULT_JONAS_SCORE_LIMIT = 100;
+
+export function defaultScoreTarget(slug: string): number {
+  return slug === "jonas-spil"
+    ? DEFAULT_JONAS_SCORE_LIMIT
+    : DEFAULT_WINNING_SCORE;
+}
+
 export function computeStandings(
   slug: string,
   players: Player[],
   rounds: Round[],
-  winningScore: number = DEFAULT_WINNING_SCORE
+  scoreTarget: number = defaultScoreTarget(slug)
 ): Standings {
   const ids = players.map((p) => p.id);
   const totals: Record<string, number> = Object.fromEntries(
@@ -103,21 +112,23 @@ export function computeStandings(
     return { totals, finished, winnerIds: [], loserIds };
   }
 
-  // 500 and Pirate Bridge: totals are simple sums.
+  // 500, Jona's spil, and Pirate Bridge: totals are simple sums.
   for (const round of rounds) {
     for (const id of ids) totals[id] += round.scores[id] ?? 0;
   }
 
-  if (slug === "500") {
+  if (slug === "500" || slug === "jonas-spil") {
     // A round counts once every player has had a turn; check after each round.
     const running: Record<string, number> = Object.fromEntries(
       ids.map((id) => [id, 0])
     );
     for (const round of rounds) {
       for (const id of ids) running[id] += round.scores[id] ?? 0;
-      const reached = ids.filter((id) => running[id] >= winningScore);
+      const reached = ids.filter((id) => running[id] >= scoreTarget);
       if (reached.length > 0) {
-        return { totals, finished: true, winnerIds: reached, loserIds: [] };
+        return slug === "500"
+          ? { totals, finished: true, winnerIds: reached, loserIds: [] }
+          : { totals, finished: true, winnerIds: [], loserIds: reached };
       }
     }
     return { totals, finished: false, winnerIds: [], loserIds: [] };

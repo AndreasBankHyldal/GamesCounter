@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { SUIT_SYMBOL, type Suit } from "@/lib/games";
 import {
   computeStandings,
-  DEFAULT_WINNING_SCORE,
+  defaultScoreTarget,
   gabongHundredHits,
   makeRound,
   pirateRoundInfo,
@@ -77,9 +77,10 @@ export function GameScreen({
 
   const { players, rounds } = session;
   const isPirate = slug === "piratbridge";
-  const lowerIsBetter = slug === "gabong";
-  const winningScore = session.winningScore ?? DEFAULT_WINNING_SCORE;
-  const standings = computeStandings(slug, players, rounds, winningScore);
+  const isJonas = slug === "jonas-spil";
+  const lowerIsBetter = slug === "gabong" || isJonas;
+  const scoreTarget = session.winningScore ?? defaultScoreTarget(slug);
+  const standings = computeStandings(slug, players, rounds, scoreTarget);
   const finished = session.status === "finished";
 
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? "?";
@@ -88,8 +89,8 @@ export function GameScreen({
     players.every((p) => p.id in round.scores);
 
   const recomputeStatus = (rs: Round[]): GameStatus => {
-    if (slug === "500" || slug === "gabong") {
-      return computeStandings(slug, players, rs, winningScore).finished
+    if (slug === "500" || slug === "gabong" || isJonas) {
+      return computeStandings(slug, players, rs, scoreTarget).finished
         ? "finished"
         : "active";
     }
@@ -97,7 +98,7 @@ export function GameScreen({
   };
 
   const buildResult = (rs: Round[]): ResultInfo | null => {
-    const s = computeStandings(slug, players, rs, winningScore);
+    const s = computeStandings(slug, players, rs, scoreTarget);
     if (slug === "gabong") {
       if (!s.loserIds.length) return null;
       return {
@@ -107,12 +108,23 @@ export function GameScreen({
         highlightIds: s.loserIds,
       };
     }
+    if (isJonas) {
+      if (!s.loserIds.length) return null;
+      return {
+        emoji: "💥",
+        title: "Game over",
+        caption: `${s.loserIds.map(nameOf).join(", ")} reached ${scoreTarget} and ${
+          s.loserIds.length > 1 ? "lose" : "loses"
+        }`,
+        highlightIds: s.loserIds,
+      };
+    }
     if (!s.winnerIds.length) return null;
     return {
       emoji: "🏆",
       title: s.winnerIds.length > 1 ? "Winners!" : "Winner!",
       caption:
-        slug === "500" ? `First to ${winningScore} points!` : "Highest score wins",
+        slug === "500" ? `First to ${scoreTarget} points!` : "Highest score wins",
       highlightIds: s.winnerIds,
     };
   };
@@ -172,13 +184,17 @@ export function GameScreen({
   if (finished) {
     if (slug === "gabong") {
       banner = `💥 ${[...losers].map(nameOf).join(", ")} busted — game over`;
+    } else if (isJonas) {
+      banner = `💥 ${[...losers].map(nameOf).join(", ")} reached ${scoreTarget} — game over`;
     } else {
       banner = `👑 ${standings.winnerIds.map(nameOf).join(", ")} ${
-        slug === "500" ? `reached ${winningScore}!` : "wins!"
+        slug === "500" ? `reached ${scoreTarget}!` : "wins!"
       }`;
     }
   } else if (slug === "500") {
-    banner = `First to ${winningScore} wins`;
+    banner = `First to ${scoreTarget} wins`;
+  } else if (isJonas) {
+    banner = `First to ${scoreTarget} loses`;
   } else if (slug === "gabong") {
     banner = "Avoid hitting 500 — that player loses";
   } else {
@@ -336,9 +352,12 @@ export function GameScreen({
           hint={
             slug === "500"
               ? "Points are multiples of 5 (negatives allowed)."
+              : isJonas
+                ? "Add the points gained this round."
               : undefined
           }
           initial={editingScores}
+          allowNegative={!isJonas}
           onSave={(scores) =>
             editing === "new" ? addRound(scores) : saveRound(editing.index, scores)
           }

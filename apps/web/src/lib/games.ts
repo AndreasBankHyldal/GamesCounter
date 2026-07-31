@@ -44,6 +44,12 @@ export const games: Game[] = [
     tagline: "Family card game",
     suit: "club",
   },
+  {
+    slug: "jonas-spil",
+    name: "Jona's spil",
+    tagline: "First to the limit loses",
+    suit: "heart",
+  },
 ];
 
 export function getGame(slug: string): Game | undefined {
