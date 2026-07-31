@@ -10,6 +10,7 @@ export function RoundSheet({
   subtitle,
   hint,
   initial,
+  allowNegative = true,
   onSave,
   onClose,
   onDelete,
@@ -19,6 +20,7 @@ export function RoundSheet({
   subtitle?: string;
   hint?: string;
   initial: Record<string, number>;
+  allowNegative?: boolean;
   onSave: (scores: Record<string, number>) => void;
   onClose: () => void;
   onDelete?: () => void;
@@ -52,7 +54,11 @@ export function RoundSheet({
     for (const p of players) {
       const raw = (values[p.id] ?? "").trim();
       const n = raw === "" ? 0 : Math.round(Number(raw));
-      scores[p.id] = Number.isFinite(n) ? n : 0;
+      scores[p.id] = Number.isFinite(n)
+        ? allowNegative
+          ? n
+          : Math.max(0, n)
+        : 0;
     }
     onSave(scores);
   };
@@ -90,29 +96,33 @@ export function RoundSheet({
                 <span className="min-w-0 flex-1 truncate font-medium text-white">
                   {p.name}
                 </span>
-                {(() => {
-                  const isNeg = (values[p.id] ?? "").trim().startsWith("-");
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => toggleSign(p.id)}
-                      aria-pressed={isNeg}
-                      aria-label={
-                        isNeg ? `Make ${p.name}'s score positive` : `Make ${p.name}'s score negative`
-                      }
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-2xl font-bold leading-none transition ${
-                        isNeg
-                          ? "border-card-red-light bg-card-red/30 text-white"
-                          : "border-white/15 bg-white/10 text-white/60 hover:text-white"
-                      }`}
-                    >
-                      {isNeg ? "−" : "+"}
-                    </button>
-                  );
-                })()}
+                {allowNegative &&
+                  (() => {
+                    const isNeg = (values[p.id] ?? "").trim().startsWith("-");
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => toggleSign(p.id)}
+                        aria-pressed={isNeg}
+                        aria-label={
+                          isNeg
+                            ? `Make ${p.name}'s score positive`
+                            : `Make ${p.name}'s score negative`
+                        }
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-2xl font-bold leading-none transition ${
+                          isNeg
+                            ? "border-card-red-light bg-card-red/30 text-white"
+                            : "border-white/15 bg-white/10 text-white/60 hover:text-white"
+                        }`}
+                      >
+                        {isNeg ? "−" : "+"}
+                      </button>
+                    );
+                  })()}
                 <input
                   type="number"
                   inputMode="numeric"
+                  min={allowNegative ? undefined : 0}
                   value={values[p.id]}
                   onChange={(e) =>
                     setValues((prev) => ({ ...prev, [p.id]: e.target.value }))

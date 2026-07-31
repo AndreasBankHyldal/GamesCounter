@@ -21,7 +21,10 @@ function resultLabel(session: GameSession): string {
   );
   const nameOf = (id: string) =>
     session.players.find((p) => p.id === id)?.name ?? "?";
-  if (session.slug === "gabong" && standings.loserIds.length) {
+  if (
+    (session.slug === "gabong" || session.slug === "jonas-spil") &&
+    standings.loserIds.length
+  ) {
     return `${standings.loserIds.map(nameOf).join(", ")} lost`;
   }
   if (standings.winnerIds.length) {

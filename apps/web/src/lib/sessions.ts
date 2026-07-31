@@ -12,7 +12,7 @@ export interface GameSession {
   status: GameStatus;
   createdAt: number;
   updatedAt: number;
-  /** 500 only: the target score that wins the game. */
+  /** Score target for 500 (wins) or Jona's spil (loses). */
   winningScore?: number;
 }
 
@@ -102,7 +102,9 @@ export function createSession(
     status: "active",
     createdAt: now,
     updatedAt: now,
-    ...(slug === "500" && winningScore ? { winningScore } : {}),
+    ...((slug === "500" || slug === "jonas-spil") && winningScore
+      ? { winningScore }
+      : {}),
   };
   return upsertSession(session);
 }
