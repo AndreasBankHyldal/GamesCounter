@@ -164,6 +164,8 @@ export function GameScreen({
   };
   const rename = (name: string) =>
     setSession(upsertSession({ ...session, name }));
+  const startRematch = () =>
+    router.push(`/games/${slug}/${session.id}/rematch`);
   const removeGame = () => {
     if (!window.confirm("Delete this game?")) return;
     deleteSession(session.id);
@@ -329,10 +331,31 @@ export function GameScreen({
           <button
             type="button"
             onClick={() => setEditing("new")}
-            className="game-card mt-3 w-full rounded-2xl py-3.5 font-bold text-white"
+            className={
+              // Once the game is over, adding a round is a correction — the
+              // rematch below it becomes the primary action.
+              finished
+                ? "mt-3 w-full rounded-2xl border border-white/15 bg-white/5 py-3.5 font-semibold text-white/70 transition hover:bg-white/10"
+                : "game-card mt-3 w-full rounded-2xl py-3.5 font-bold text-white"
+            }
           >
             + Add round
           </button>
+        )}
+
+        {finished && (
+          <>
+            <button
+              type="button"
+              onClick={startRematch}
+              className="game-card mt-3 w-full rounded-2xl py-3.5 font-bold text-white"
+            >
+              🔁 Rematch
+            </button>
+            <p className="mt-2 text-center text-xs text-white/40">
+              Play again with the same crew — swap players in or out first.
+            </p>
+          </>
         )}
 
         <button
@@ -386,6 +409,7 @@ export function GameScreen({
           players={players}
           highlightIds={resultPopup.highlightIds}
           onClose={() => setResultPopup(null)}
+          onRematch={startRematch}
         />
       )}
     </main>

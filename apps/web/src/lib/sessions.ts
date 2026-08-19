@@ -14,6 +14,12 @@ export interface GameSession {
   updatedAt: number;
   /** Score target for 500 (wins) or Jona's spil (loses). */
   winningScore?: number;
+  /**
+   * Position in a rematch chain: 1 for the first rematch, 2 for a rematch of
+   * that one, and so on. Resolved at creation so the name stays correct even
+   * if the game it was a rematch of is later deleted.
+   */
+  rematchNumber?: number;
 }
 
 const KEY = "gc:sessions";
@@ -68,21 +74,38 @@ export function sessionsForSlug(slug: string): GameSession[] {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-function autoName(players: Player[], ts: number): string {
+function autoName(
+  players: Player[],
+  ts: number,
+  rematchNumber?: number
+): string {
   const date = new Date(ts).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
   });
   const names = players.map((p) => p.name).join(", ");
-  return `${date} · ${names}`;
+  const suffix = rematchNumber ? ` · Rematch ${rematchNumber}` : "";
+  return `${date} · ${names}${suffix}`;
 }
 
-export function createSession(
-  slug: string,
-  players: Player[],
-  startCards?: number,
-  winningScore?: number
-): GameSession {
+export interface CreateSessionOptions {
+  slug: string;
+  players: Player[];
+  /** Pirate Bridge only: cards dealt in the first round (= round count). */
+  startCards?: number;
+  /** 500 / Jona's spil only: the score that ends the game. */
+  winningScore?: number;
+  /** The finished session this is a rematch of, if any. */
+  rematchOf?: GameSession;
+}
+
+export function createSession({
+  slug,
+  players,
+  startCards,
+  winningScore,
+  rematchOf,
+}: CreateSessionOptions): GameSession {
   const now = Date.now();
   // Pirate Bridge has a fixed schedule of rounds; pre-create them empty.
   // The starting card count is clamped to [1, deck max] for a shorter match.
@@ -93,10 +116,14 @@ export function createSession(
       ? Array.from({ length: count }, () => makeRound())
       : [];
 
+  const rematchNumber = rematchOf
+    ? (rematchOf.rematchNumber ?? 0) + 1
+    : undefined;
+
   const session: GameSession = {
     id: newId(),
     slug,
-    name: autoName(players, now),
+    name: autoName(players, now, rematchNumber),
     players,
     rounds,
     status: "active",
@@ -105,6 +132,7 @@ export function createSession(
     ...((slug === "500" || slug === "jonas-spil") && winningScore
       ? { winningScore }
       : {}),
+    ...(rematchNumber ? { rematchNumber } : {}),
   };
   return upsertSession(session);
 }

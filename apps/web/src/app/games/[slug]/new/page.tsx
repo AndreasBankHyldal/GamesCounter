@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getGame } from "@/lib/games";
-import { NewGame } from "@/components/NewGame";
+import { GameSetup } from "@/components/GameSetup";
 
 export default async function NewGamePage({
   params,
@@ -11,5 +11,12 @@ export default async function NewGamePage({
   const game = getGame(slug);
   if (!game) notFound();
 
-  return <NewGame slug={game.slug} gameName={game.name} suit={game.suit} />;
+  return (
+    <GameSetup
+      slug={game.slug}
+      suit={game.suit}
+      title={`New ${game.name} game`}
+      backHref={`/games/${game.slug}`}
+    />
+  );
 }

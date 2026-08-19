@@ -9,31 +9,56 @@ import {
   defaultScoreTarget,
   pirateStartCards,
 } from "@/lib/scoring";
-import { createSession } from "@/lib/sessions";
+import { createSession, type GameSession } from "@/lib/sessions";
 import { PlayerManager } from "./PlayerManager";
 
-export function NewGame({
+export function GameSetup({
   slug,
-  gameName,
   suit,
+  title,
+  backHref,
+  submitLabel,
+  initialPlayers,
+  initialStartCards = null,
+  initialScoreTarget,
+  rematchOf,
 }: {
   slug: string;
-  gameName: string;
   suit: Suit;
+  /** Heading shown next to the suit symbol. */
+  title: string;
+  /** Where the ← arrow goes. */
+  backHref: string;
+  /** Label for the confirm button. */
+  submitLabel?: string;
+  /** Roster to start from — omitted for a new game, carried over for a rematch. */
+  initialPlayers?: Player[];
+  /** Pirate Bridge starting cards; null uses the deck default. */
+  initialStartCards?: number | null;
+  /** 500 / Jona's spil score target. */
+  initialScoreTarget?: number;
+  /** The finished session this game is a rematch of, if any. */
+  rematchOf?: GameSession;
 }) {
   const router = useRouter();
   // null = use the deck default (floor(52 / players)).
-  const [startCards, setStartCards] = useState<number | null>(null);
-  const [scoreTarget, setScoreTarget] = useState(defaultScoreTarget(slug));
+  const [startCards, setStartCards] = useState<number | null>(
+    initialStartCards
+  );
+  const [scoreTarget, setScoreTarget] = useState(
+    initialScoreTarget ?? defaultScoreTarget(slug)
+  );
   const hasScoreTarget = slug === "500" || slug === "jonas-spil";
 
   const start = (players: Player[]) => {
-    const session = createSession(
+    const session = createSession({
       slug,
       players,
-      slug === "piratbridge" ? (startCards ?? undefined) : undefined,
-      hasScoreTarget ? scoreTarget : undefined
-    );
+      startCards:
+        slug === "piratbridge" ? (startCards ?? undefined) : undefined,
+      winningScore: hasScoreTarget ? scoreTarget : undefined,
+      rematchOf,
+    });
     router.replace(`/games/${slug}/${session.id}`);
   };
 
@@ -128,7 +153,7 @@ export function NewGame({
     <main className="felt flex flex-1 flex-col items-center px-5 py-10">
       <header className="mb-8 flex w-full max-w-md items-center gap-3">
         <Link
-          href={`/games/${slug}`}
+          href={backHref}
           className="rounded-full px-2 py-1 text-2xl text-white/70 transition hover:text-white"
           aria-label="Back"
         >
@@ -136,11 +161,16 @@ export function NewGame({
         </Link>
         <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
           <span aria-hidden>{SUIT_SYMBOL[suit]}</span>
-          New {gameName} game
+          {title}
         </h1>
       </header>
 
-      <PlayerManager onStart={start} belowPlayers={config} />
+      <PlayerManager
+        onStart={start}
+        belowPlayers={config}
+        initialPlayers={initialPlayers}
+        submitLabel={submitLabel}
+      />
     </main>
   );
 }
