@@ -8,14 +8,21 @@ import { AvatarPicker } from "./AvatarPicker";
 export function PlayerManager({
   onStart,
   belowPlayers,
+  initialPlayers,
+  submitLabel = "Start game",
 }: {
   /** Called with the finalised roster when the user starts the game. */
   onStart: (players: Player[]) => void;
   /** Optional per-game config rendered just above the Start button. */
   belowPlayers?: (players: Player[]) => ReactNode;
+  /** Seed the roster, e.g. carrying a previous game's players into a rematch. */
+  initialPlayers?: Player[];
+  /** Label for the confirm button. */
+  submitLabel?: string;
 }) {
-  // Players are intentionally not persisted — each new game starts blank.
-  const [players, setPlayers] = useState<Player[]>([]);
+  // Players are intentionally not persisted — a new game starts blank unless a
+  // roster is handed in (rematch).
+  const [players, setPlayers] = useState<Player[]>(initialPlayers ?? []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
 
@@ -123,7 +130,7 @@ export function PlayerManager({
         disabled={!canStart}
         className="game-card mt-6 w-full rounded-2xl py-4 text-lg font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Start game
+        {submitLabel}
       </button>
       {!canStart && (
         <p className="mt-2 text-center text-xs text-white/40">

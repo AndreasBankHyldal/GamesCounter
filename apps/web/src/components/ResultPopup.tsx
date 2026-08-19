@@ -11,6 +11,7 @@ export function ResultPopup({
   players,
   highlightIds,
   onClose,
+  onRematch,
 }: {
   emoji: string;
   title: string;
@@ -18,6 +19,8 @@ export function ResultPopup({
   players: Player[];
   highlightIds: string[];
   onClose: () => void;
+  /** When given, offers a rematch with the same crew as the primary action. */
+  onRematch?: () => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -59,10 +62,24 @@ export function ResultPopup({
 
         <p className="mt-4 text-sm text-white/60">{caption}</p>
 
+        {onRematch && (
+          <button
+            type="button"
+            onClick={onRematch}
+            className="game-card mt-5 w-full rounded-xl py-3 font-semibold text-white"
+          >
+            🔁 Rematch
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onClose}
-          className="game-card mt-5 w-full rounded-xl py-3 font-semibold text-white"
+          className={
+            onRematch
+              ? "mt-2 w-full rounded-xl py-3 font-semibold text-white/60 transition hover:text-white"
+              : "game-card mt-5 w-full rounded-xl py-3 font-semibold text-white"
+          }
         >
           Continue
         </button>

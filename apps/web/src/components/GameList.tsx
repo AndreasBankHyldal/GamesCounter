@@ -116,7 +116,11 @@ export function GameList({
                         {session.name}
                       </p>
                       <p className="truncate text-xs text-white/50">
-                        {session.players.length} players · {resultLabel(session)}
+                        {session.players.length} players
+                        {session.rematchNumber
+                          ? ` · Rematch ${session.rematchNumber}`
+                          : ""}{" "}
+                        · {resultLabel(session)}
                       </p>
                     </div>
                   </Link>
