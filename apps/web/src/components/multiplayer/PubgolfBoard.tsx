@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BoardProps } from "boardgame.io/react";
 import {
@@ -598,18 +598,6 @@ function ScoresTab({
     if (bars[clamped]) setSelectedId(bars[clamped].id);
   }
 
-  // Swipe left/right on the scorecard to move between pubs.
-  const touchStartX = useRef<number | null>(null);
-  function onTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX;
-  }
-  function onTouchEnd(e: React.TouchEvent) {
-    if (touchStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    touchStartX.current = null;
-    if (Math.abs(dx) > 45) goTo(currentIndex + (dx < 0 ? 1 : -1));
-  }
-
   if (bars.length === 0) {
     return (
       <Card>
@@ -651,20 +639,17 @@ function ScoresTab({
 
       <div className="flex justify-center gap-1.5">
         {bars.map((b, i) => (
-          <button
+          <span
             key={b.id}
-            type="button"
-            onClick={() => goTo(i)}
-            aria-label={`Go to ${b.name}`}
+            aria-hidden="true"
             className={`h-1.5 rounded-full transition-all ${
-              i === currentIndex ? "w-5 bg-amber-400" : "w-1.5 bg-white/25 hover:bg-white/40"
+              i === currentIndex ? "w-5 bg-amber-400" : "w-1.5 bg-white/25"
             }`}
           />
         ))}
       </div>
 
       {selected && (
-        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <Card>
           <div className="mb-1 flex items-center justify-between gap-2">
             <span className="min-w-0 truncate text-lg font-bold text-white">
@@ -759,7 +744,6 @@ function ScoresTab({
             })}
           </ul>
         </Card>
-        </div>
       )}
 
       <button
