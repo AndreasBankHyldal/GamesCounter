@@ -29,6 +29,13 @@ interface CleanupOpts {
    * opt in explicitly once they know their store supports the hook.
    */
   activityGated?: boolean;
+  /** Receives match counts after each successful sweep. */
+  onSweep?: (summary: CleanupSummary) => void;
+}
+
+export interface CleanupSummary {
+  matchCount: number;
+  unfinishedMatchCount: number;
 }
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
@@ -66,6 +73,7 @@ export function startCleanup(rawDb: unknown, opts: CleanupOpts = {}): () => void
   const defaultIdleMs = opts.idleMs ?? FIFTEEN_MINUTES;
   const intervalMs = opts.intervalMs ?? ONE_MINUTE;
   const activityGated = opts.activityGated ?? false;
+  const onSweep = opts.onSweep;
 
   let timer: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
@@ -81,6 +89,7 @@ export function startCleanup(rawDb: unknown, opts: CleanupOpts = {}): () => void
     try {
       const ids = await Promise.resolve(db.listMatches());
       let survivingCount = 0;
+      let unfinishedCount = 0;
       for (const id of ids) {
         const { metadata } = await Promise.resolve(db.fetch(id, { metadata: true }));
         if (!metadata) continue;
@@ -94,8 +103,13 @@ export function startCleanup(rawDb: unknown, opts: CleanupOpts = {}): () => void
           console.log(`[cleanup] wiped idle match ${id} (idle ${Math.round(idleFor / 1000)}s)`);
         } else {
           survivingCount++;
+          if (metadata.gameover === undefined) unfinishedCount++;
         }
       }
+      onSweep?.({
+        matchCount: survivingCount,
+        unfinishedMatchCount: unfinishedCount,
+      });
       if (survivingCount === 0) goDormant();
     } catch (err) {
       console.error("[cleanup] sweep failed:", err);

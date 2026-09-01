@@ -23,3 +23,5 @@ services:
         sync: false # set this to your Vercel URL in the dashboard after deploy
       - key: DATABASE_URL
         sync: false # set to the external Neon Postgres URI in the dashboard
+      - key: ADMIN_SECRET
+        sync: false # generate with: openssl rand -hex 32
