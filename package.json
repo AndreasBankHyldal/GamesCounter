@@ -14,6 +14,8 @@
     "build:web": "npm run build --workspace apps/web",
     "build:server": "npm run build --workspace apps/server",
     "start:server": "npm run start --workspace apps/server",
+    "render:status": "node scripts/render-admin.mjs status",
+    "render:sleep": "node scripts/render-admin.mjs sleep",
     "lint": "npm run lint --workspace apps/web",
     "typecheck:games": "tsc -p packages/games"
   },

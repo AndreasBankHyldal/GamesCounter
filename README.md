@@ -111,25 +111,26 @@ reconnects. Match data remains in Postgres while Render sleeps.
 
 #### Keep-alive controls
 
-Set the Render URL and the same secret configured in `ADMIN_SECRET`:
+Create a local configuration file once:
 
 ```bash
-export SERVER_URL=https://gamescounter-server.onrender.com
-export ADMIN_SECRET=replace-with-your-secret
+cp scripts/render-admin.env.example .env.render-admin
 ```
+
+Open `.env.render-admin` and replace `ADMIN_SECRET` with the same value configured
+in Render. This local file is ignored by Git, so the secret will not be
+committed.
 
 Inspect the keep-alive state and persisted rooms:
 
 ```bash
-curl -sS "$SERVER_URL/admin/keepalive/status" \
-  -H "Authorization: Bearer $ADMIN_SECRET"
+npm run render:status
 ```
 
 Stop all self-pinging without deleting any rooms:
 
 ```bash
-curl -sS -X POST "$SERVER_URL/admin/keepalive/sleep" \
-  -H "Authorization: Bearer $ADMIN_SECRET"
+npm run render:sleep
 ```
 
 The command may wake a sleeping Render instance long enough to respond, but it
