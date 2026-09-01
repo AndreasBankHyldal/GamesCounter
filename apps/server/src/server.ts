@@ -2,7 +2,9 @@ import { Server, Origins } from "boardgame.io/server";
 import { FiveHundred, Piratbridge, Pubgolf } from "@gamescounter/games";
 import { makeRoomCode } from "./codes";
 import { startCleanup } from "./cleanup";
-import { startKeepAlive } from "./keepalive";
+import { configureAdminRoutes } from "./admin";
+import { ActivitySocketIO } from "./activity-transport";
+import { createKeepAlive } from "./keepalive";
 import { PostgresStore } from "./db";
 
 const PORT = Number(process.env.PORT ?? 8000);
@@ -51,24 +53,45 @@ async function resolveDb(): Promise<PostgresStore | undefined> {
 
 async function main() {
   const db = await resolveDb();
+  const keepAlive = createKeepAlive();
+  const transport = new ActivitySocketIO(keepAlive.markActivity);
 
   const server = Server({
     games: [FiveHundred, Piratbridge, Pubgolf],
     origins,
     db,
+    transport,
     // Matches are private (unlisted) and addressed by a short shareable code.
     // Overriding `uuid` makes the lobby's create endpoint mint these codes.
     uuid: () => makeRoomCode(),
   });
 
+  // A successful room creation is real activity. Register this middleware
+  // before boardgame.io appends its own create route during server.run().
+  server.router.use("/games/:name/create", async (ctx, next) => {
+    await next();
+    if (ctx.method === "POST" && ctx.status >= 200 && ctx.status < 300) {
+      keepAlive.markActivity();
+    }
+  });
+
+  const adminConfigured = configureAdminRoutes(server.router, server.db, keepAlive);
+  if (!adminConfigured) {
+    console.warn("[admin] ADMIN_SECRET is not set — keep-alive controls are disabled");
+  }
+
   // Auto-delete matches once everyone has been gone for the game's idle window.
   // activityGated: only Postgres (db truthy) implements the onWrite hook that
   // lets the sweep safely go dormant between matches, saving Neon compute
   // hours; the in-memory dev fallback keeps the old always-on polling.
-  startCleanup(server.db, { activityGated: !!db });
-
-  // Keep the Render free instance awake during play (no-op off Render).
-  startKeepAlive();
+  startCleanup(server.db, {
+    activityGated: !!db,
+    onSweep: ({ unfinishedMatchCount }) => {
+      if (unfinishedMatchCount === 0) {
+        keepAlive.stopForNoUnfinishedMatches();
+      }
+    },
+  });
 
   server.run(PORT, () => {
     console.log(`boardgame.io server listening on :${PORT}`);

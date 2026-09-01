@@ -87,6 +87,8 @@ Blueprint) or create a **Web Service** manually with:
   - `CLIENT_ORIGIN` = your Vercel URL (Render injects `PORT` and
     `RENDER_EXTERNAL_URL` itself).
   - `DATABASE_URL` = a Postgres connection string (see below).
+  - `ADMIN_SECRET` = a high-entropy secret used for operational controls.
+    Generate one with `openssl rand -hex 32`.
 
 The server runs TypeScript directly via `tsx` (a runtime dependency — no build
 step). Copy the resulting URL, e.g. `https://gamescounter-server.onrender.com`.
@@ -102,9 +104,37 @@ on every restart/spin-down. To keep games alive:
 3. Redeploy. Logs should show `Storage: Postgres (persistent)`. The
    `bgio_matches` table is created automatically on first boot.
 
-The server also **self-pings** `RENDER_EXTERNAL_URL` every 10 min to keep the
-free instance from spinning down mid-session (automatic on Render; no-op
-locally).
+The server **self-pings** `RENDER_EXTERNAL_URL` every 10 min while a multiplayer
+game is active. It stops pinging when no unfinished matches remain, allowing the
+free instance to sleep, and starts again when a room is created or a player
+reconnects. Match data remains in Postgres while Render sleeps.
+
+#### Keep-alive controls
+
+Set the Render URL and the same secret configured in `ADMIN_SECRET`:
+
+```bash
+export SERVER_URL=https://gamescounter-server.onrender.com
+export ADMIN_SECRET=replace-with-your-secret
+```
+
+Inspect the keep-alive state and persisted rooms:
+
+```bash
+curl -sS "$SERVER_URL/admin/keepalive/status" \
+  -H "Authorization: Bearer $ADMIN_SECRET"
+```
+
+Stop all self-pinging without deleting any rooms:
+
+```bash
+curl -sS -X POST "$SERVER_URL/admin/keepalive/sleep" \
+  -H "Authorization: Bearer $ADMIN_SECRET"
+```
+
+The command may wake a sleeping Render instance long enough to respond, but it
+does not restart keep-alive. A new room or player reconnection restarts it
+automatically. Without `ADMIN_SECRET`, both admin routes are disabled.
 
 ### Web → Vercel
 
@@ -113,8 +143,7 @@ locally).
 
 ### Free-tier caveats
 
-- A keep-alive ping keeps the instance awake, but a free service still uses
-  ~720 of the 750 monthly instance-hours when always-on — fine for a single
-  service. Redeploys still cause a brief restart.
+- Keep-alive protects active games from Render's idle spin-down. Once it stops,
+  the next connection may have a normal Render cold-start delay.
 - Render's **free Postgres** has storage/age limits; upgrade if you need it
   long-term.
