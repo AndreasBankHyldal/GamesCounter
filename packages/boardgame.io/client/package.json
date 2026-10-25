@@ -1,0 +1,7 @@
+{
+  "name": "boardgame.io/client",
+  "private": true,
+  "types": "../lib/types/packages/client.d.ts",
+  "main": "../lib/cjs/client.js",
+  "module": "../lib/esm/client.js"
+}

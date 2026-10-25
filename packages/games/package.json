@@ -12,10 +12,10 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "boardgame.io": "^0.50.2"
+    "boardgame.io": "0.50.2-gamescounter.1"
   },
   "devDependencies": {
-    "boardgame.io": "^0.50.2",
+    "boardgame.io": "0.50.2-gamescounter.1",
     "typescript": "^5"
   }
 }

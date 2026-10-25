@@ -1,0 +1,6 @@
+{
+  "name": "boardgame.io/server",
+  "private": true,
+  "types": "../lib/types/packages/server.d.ts",
+  "main": "../lib/cjs/server.js"
+}

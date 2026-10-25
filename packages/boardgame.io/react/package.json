@@ -1,0 +1,7 @@
+{
+  "name": "boardgame.io/react",
+  "private": true,
+  "types": "../lib/types/packages/react.d.ts",
+  "main": "../lib/cjs/react.js",
+  "module": "../lib/esm/react.js"
+}

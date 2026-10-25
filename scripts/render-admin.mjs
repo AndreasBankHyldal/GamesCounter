@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { adminServerUrl } from "./admin-url.mjs";
 
 function parseConfig(contents) {
   const config = {};
@@ -45,10 +46,7 @@ if (!adminSecret) {
   throw new Error(`ADMIN_SECRET is missing. Add it to ${configPath}.`);
 }
 
-const baseUrl = new URL(serverUrl);
-if (baseUrl.protocol !== "https:" && baseUrl.protocol !== "http:") {
-  throw new Error("SERVER_URL must use http or https");
-}
+const baseUrl = adminServerUrl(serverUrl);
 
 const endpoint =
   action === "status"

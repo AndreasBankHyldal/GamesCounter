@@ -1,4 +1,4 @@
-import { Server, Origins } from "boardgame.io/server";
+import { Server } from "boardgame.io/server";
 import { FiveHundred, Piratbridge, Pubgolf } from "@gamescounter/games";
 import { makeRoomCode } from "./codes";
 import { startCleanup } from "./cleanup";
@@ -6,6 +6,7 @@ import { configureAdminRoutes } from "./admin";
 import { ActivitySocketIO } from "./activity-transport";
 import { createKeepAlive } from "./keepalive";
 import { PostgresStore } from "./db";
+import { clientOrigins, enforceBrowserOrigin, generatePlayerCredentials } from "./security";
 
 const PORT = Number(process.env.PORT ?? 8000);
 
@@ -18,12 +19,6 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[server] unhandled rejection:", reason);
 });
-
-// Allowed browser origins for the game + lobby API. Localhost is always allowed
-// for development; the deployed web origin comes from CLIENT_ORIGIN. Vercel
-// preview URLs (*.vercel.app) are allowed via regex so previews work too.
-const origins: (string | RegExp)[] = [Origins.LOCALHOST, /\.vercel\.app$/];
-if (process.env.CLIENT_ORIGIN) origins.push(process.env.CLIENT_ORIGIN);
 
 // Persist matches in Postgres when DATABASE_URL is set so games survive a
 // server restart / spin-down; otherwise fall back to boardgame.io's in-memory
@@ -52,9 +47,10 @@ async function resolveDb(): Promise<PostgresStore | undefined> {
 }
 
 async function main() {
+  const origins = clientOrigins();
   const db = await resolveDb();
   const keepAlive = createKeepAlive();
-  const transport = new ActivitySocketIO(keepAlive.markActivity);
+  const transport = new ActivitySocketIO(keepAlive.markActivity, origins);
 
   const server = Server({
     games: [FiveHundred, Piratbridge, Pubgolf],
@@ -64,7 +60,10 @@ async function main() {
     // Matches are private (unlisted) and addressed by a short shareable code.
     // Overriding `uuid` makes the lobby's create endpoint mint these codes.
     uuid: () => makeRoomCode(),
+    generateCredentials: generatePlayerCredentials,
   });
+
+  server.app.use(enforceBrowserOrigin(origins));
 
   // A successful room creation is real activity. Register this middleware
   // before boardgame.io appends its own create route during server.run().

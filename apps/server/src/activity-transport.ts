@@ -1,12 +1,22 @@
 import { SocketIO } from "boardgame.io/server";
+import { isAllowedClientOrigin } from "./security";
 
 /**
  * Exposes authenticated game sync attempts as keep-alive activity without
  * reaching into SocketIO's private runtime fields.
  */
 export class ActivitySocketIO extends SocketIO {
-  constructor(private readonly onActivity: () => void) {
-    super();
+  constructor(
+    private readonly onActivity: () => void,
+    origins: readonly string[]
+  ) {
+    super({
+      socketOpts: {
+        allowRequest: (request, callback) => {
+          callback(null, isAllowedClientOrigin(request.headers.origin, origins));
+        },
+      },
+    });
   }
 
   override init(...args: Parameters<SocketIO["init"]>): void {

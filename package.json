@@ -21,5 +21,29 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
+  },
+  "overrides": {
+    "@koa/cors": "5.0.0",
+    "koa-socket-2": {
+      "socket.io": "4.8.3"
+    },
+    "engine.io@^6": "6.6.10",
+    "socket.io-parser@^4": "4.2.7",
+    "ws@^8": "8.21.0",
+    "qs": "6.16.0",
+    "nanoid@^3": "3.3.18",
+    "react-cookies": {
+      "cookie": "0.7.2"
+    },
+    "shell-quote": "1.11.0",
+    "brace-expansion@^1": "1.1.21",
+    "brace-expansion@^5": "5.0.12",
+    "js-yaml": "4.3.2",
+    "browserslist": "4.28.7",
+    "baseline-browser-mapping": "2.11.0",
+    "postcss": "8.5.23",
+    "source-map-js": "1.2.2",
+    "zod": "4.6.6",
+    "esbuild": "0.28.1"
   }
 }

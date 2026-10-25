@@ -1,0 +1,7 @@
+{
+  "name": "boardgame.io/core",
+  "private": true,
+  "types": "../lib/types/packages/core.d.ts",
+  "main": "../lib/cjs/core.js",
+  "module": "../lib/esm/core.js"
+}
