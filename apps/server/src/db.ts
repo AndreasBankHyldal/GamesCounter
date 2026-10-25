@@ -4,11 +4,48 @@ import type { LogEntry, Server, State, StorageAPI } from "boardgame.io";
 
 const { Pool } = pg;
 
-/** Render Postgres needs SSL; a local database typically does not. */
-function sslFor(connectionString: string): pg.PoolConfig["ssl"] {
-  return /localhost|127\.0\.0\.1/.test(connectionString)
-    ? false
-    : { rejectUnauthorized: false };
+export function postgresPoolConfig(connectionString: string): pg.PoolConfig {
+  let url: URL;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    throw new Error("DATABASE_URL must be a valid Postgres URL");
+  }
+  if (!["postgres:", "postgresql:"].includes(url.protocol) || !url.hostname) {
+    throw new Error("DATABASE_URL must specify a Postgres host");
+  }
+  for (const key of url.searchParams.keys()) {
+    if (["host", "hostaddr", "sslcert", "sslkey", "sslrootcert"].includes(key.toLowerCase())) {
+      throw new Error(
+        "DATABASE_URL host overrides and certificate-file parameters are not supported; " +
+        "use the URL host and NODE_EXTRA_CA_CERTS for a private CA"
+      );
+    }
+  }
+
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  const mode = url.searchParams.get("sslmode");
+  const ssl = url.searchParams.get("ssl");
+  if (
+    (mode !== null && !["disable", "require", "verify-full"].includes(mode)) ||
+    (ssl !== null && !["true", "1", "false", "0"].includes(ssl)) ||
+    url.searchParams.get("uselibpqcompat") === "true" ||
+    (!local && (mode === "disable" || ssl === "false" || ssl === "0"))
+  ) {
+    throw new Error("DATABASE_URL must not disable TLS certificate or hostname verification");
+  }
+
+  const useTls = !local || mode === "require" || mode === "verify-full" ||
+    ssl === "true" || ssl === "1";
+  // pg reparses connectionString after ssl options, so remove competing flags.
+  for (const key of ["ssl", "sslmode", "uselibpqcompat"]) {
+    url.searchParams.delete(key);
+  }
+  return {
+    connectionString: url.toString(),
+    ssl: useTls ? { rejectUnauthorized: true } : false,
+    connectionTimeoutMillis: 10_000,
+  };
 }
 
 /**
@@ -35,13 +72,7 @@ export class PostgresStore extends Async {
     super();
     this.pool =
       typeof arg === "string"
-        ? new Pool({
-            connectionString: arg,
-            ssl: sslFor(arg),
-            // Fail fast if the host is unreachable (e.g. an expired free DB)
-            // so startup can fall back to in-memory instead of hanging.
-            connectionTimeoutMillis: 10_000,
-          })
+        ? new Pool(postgresPoolConfig(arg))
         : arg;
   }
 

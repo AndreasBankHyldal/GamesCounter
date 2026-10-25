@@ -1,0 +1,7 @@
+{
+  "name": "boardgame.io/multiplayer",
+  "private": true,
+  "types": "../lib/types/packages/multiplayer.d.ts",
+  "main": "../lib/cjs/multiplayer.js",
+  "module": "../lib/esm/multiplayer.js"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "boardgame.io/master",
+  "private": true,
+  "types": "../lib/types/packages/master.d.ts",
+  "main": "../lib/cjs/master.js",
+  "module": "../lib/esm/master.js"
+}

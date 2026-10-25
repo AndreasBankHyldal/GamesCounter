@@ -1,0 +1,7 @@
+{
+  "name": "boardgame.io/ai",
+  "private": true,
+  "types": "../lib/types/packages/ai.d.ts",
+  "main": "../lib/cjs/ai.js",
+  "module": "../lib/esm/ai.js"
+}

@@ -15,12 +15,14 @@ services:
     # Build from the repo ROOT (not apps/server) so npm workspaces can resolve
     # the @gamescounter/games dependency.
     rootDir: .
-    buildCommand: npm install --legacy-peer-deps
+    buildCommand: npm ci --ignore-scripts --legacy-peer-deps
     startCommand: npm run start:server
     envVars:
       # Render injects PORT and RENDER_EXTERNAL_URL automatically.
+      - key: NODE_ENV
+        value: production
       - key: CLIENT_ORIGIN
-        sync: false # set this to your Vercel URL in the dashboard after deploy
+        sync: false # comma-separated exact HTTPS production/trusted preview origins
       - key: DATABASE_URL
         sync: false # set to the external Neon Postgres URI in the dashboard
       - key: ADMIN_SECRET
