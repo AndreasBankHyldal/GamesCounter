@@ -206,6 +206,11 @@ npm audit --package-lock-only --ignore-scripts
 npm ci --ignore-scripts --legacy-peer-deps
 ```
 
+Vercel uses Node 24. When changing dependency overrides, also validate a clean
+`npm ci` from `apps/web` with the Node 24/npm toolchain before pushing. The
+dependency regression tests check that the local fork and the shared nanoid 3
+override resolve to the same locked version.
+
 Run the focused security and multiplayer regressions without starting the app:
 
 ```bash
