@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { ScorekeeperLink } from "./ScorekeeperLink";
 import { SUIT_SYMBOL, type Suit } from "@/lib/games";
 import { computeStandings } from "@/lib/scoring";
 import {
@@ -64,13 +64,13 @@ export function GameList({
   return (
     <main className="felt flex flex-1 flex-col items-center px-5 py-10">
       <header className="mb-8 flex w-full max-w-md items-center gap-3">
-        <Link
+        <ScorekeeperLink
           href="/"
           className="rounded-full px-2 py-1 text-2xl text-white/70 transition hover:text-white"
           aria-label="Back to games"
         >
           ←
-        </Link>
+        </ScorekeeperLink>
         <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
           <span aria-hidden>{SUIT_SYMBOL[suit]}</span>
           {gameName}
@@ -78,12 +78,12 @@ export function GameList({
       </header>
 
       <div className="w-full max-w-md">
-        <Link
+        <ScorekeeperLink
           href={`/games/${slug}/new`}
           className="game-card flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold text-white"
         >
           + New game
-        </Link>
+        </ScorekeeperLink>
 
         {sessions.length > 0 && (
           <>
@@ -96,7 +96,7 @@ export function GameList({
                   key={session.id}
                   className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3"
                 >
-                  <Link
+                  <ScorekeeperLink
                     href={`/games/${slug}/${session.id}`}
                     className="flex min-w-0 flex-1 items-center gap-3"
                   >
@@ -123,7 +123,7 @@ export function GameList({
                         · {resultLabel(session)}
                       </p>
                     </div>
-                  </Link>
+                  </ScorekeeperLink>
                   <button
                     type="button"
                     onClick={() => remove(session.id)}

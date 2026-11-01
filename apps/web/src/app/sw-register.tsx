@@ -17,12 +17,15 @@ export default function ServiceWorkerRegister() {
     }
 
     const register = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        /* registration is best-effort */
-      });
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .catch((error: unknown) => {
+          console.error("Offline support could not be registered.", error);
+        });
     };
 
-    window.addEventListener("load", register);
+    if (document.readyState === "complete") register();
+    else window.addEventListener("load", register, { once: true });
     return () => window.removeEventListener("load", register);
   }, []);
 

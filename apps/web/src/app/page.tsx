@@ -31,7 +31,7 @@ export default function Home() {
         <ul className="flex flex-col gap-4">
           {games.map((game) => (
             <li key={game.slug}>
-              <Link
+              <a
                 href={`/games/${game.slug}`}
                 className="game-card flex items-center gap-4 rounded-2xl px-6 py-5 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
               >
@@ -53,7 +53,7 @@ export default function Home() {
                 >
                   {SUIT_SYMBOL[game.suit]}
                 </span>
-              </Link>
+              </a>
             </li>
           ))}
         </ul>

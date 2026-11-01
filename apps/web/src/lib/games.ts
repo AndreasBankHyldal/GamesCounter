@@ -46,7 +46,7 @@ export const games: Game[] = [
   },
   {
     slug: "jonas-spil",
-    name: "Jona's spil",
+    name: "Den største taber",
     tagline: "First to the limit loses",
     suit: "heart",
   },

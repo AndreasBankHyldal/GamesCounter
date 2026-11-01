@@ -1,6 +1,7 @@
 # Games Counter
 
-A card-game companion: a single-device **scorekeeper** (500, Piratbridge, Gabong)
+A card-game companion: a single-device **scorekeeper** (500, Piratbridge, Gabong,
+Den største taber)
 plus **online multiplayer** built on [boardgame.io](https://boardgame.io), starting
 with the game **500**.
 
@@ -38,7 +39,23 @@ Open <http://localhost:3000>, choose **Play 500 online**, create a room, share t
 npm run typecheck:games   # type-check the shared engine in isolation
 npm run lint              # lint the web app
 npm run build:web         # production build of the web app
+npm run test:offline --workspace apps/web  # offline cache regressions
 ```
+
+### Offline scorekeepers
+
+500, Piratbridge, Gabong and **Den største taber** work without a connection,
+including creating games, saving/editing rounds, reopening saved games and
+rematches. Open the deployed app once while online and allow its service worker
+to finish installing before switching to airplane mode. It downloads all four
+scorekeepers and their JavaScript, styles, fonts and icons, even if you have not
+opened each game yet. Local game data stays in the same browser's `localStorage`.
+The renamed game keeps its `jonas-spil` URL and storage identity so existing
+games and links continue to work.
+
+Offline caching is production-only; test it with `npm run build:web` followed by
+`npm run start --workspace apps/web`. Online multiplayer still requires a
+connection and is not served a misleading home-page fallback while offline.
 
 ## Environment variables
 

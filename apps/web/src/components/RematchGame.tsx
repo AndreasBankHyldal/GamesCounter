@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { ScorekeeperLink } from "./ScorekeeperLink";
 import type { Suit } from "@/lib/games";
 import { defaultScoreTarget } from "@/lib/scoring";
 import { getSession, type GameSession } from "@/lib/sessions";
@@ -35,12 +35,12 @@ export function RematchGame({
     return (
       <main className="felt flex flex-1 flex-col items-center justify-center gap-4 px-5 text-center">
         <p className="text-white/80">This game could not be found.</p>
-        <Link
+        <ScorekeeperLink
           href={`/games/${slug}`}
           className="game-card rounded-xl px-5 py-3 font-semibold text-white"
         >
           ← Back to {gameName}
-        </Link>
+        </ScorekeeperLink>
       </main>
     );
   }

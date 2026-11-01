@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { navigateScorekeeper, ScorekeeperLink } from "./ScorekeeperLink";
 import { SUIT_SYMBOL, type Suit } from "@/lib/games";
 import type { Player } from "@/lib/players";
 import {
@@ -35,12 +34,11 @@ export function GameSetup({
   initialPlayers?: Player[];
   /** Pirate Bridge starting cards; null uses the deck default. */
   initialStartCards?: number | null;
-  /** 500 / Jona's spil score target. */
+  /** 500 / Den største taber score target. */
   initialScoreTarget?: number;
   /** The finished session this game is a rematch of, if any. */
   rematchOf?: GameSession;
 }) {
-  const router = useRouter();
   // null = use the deck default (floor(52 / players)).
   const [startCards, setStartCards] = useState<number | null>(
     initialStartCards
@@ -59,7 +57,7 @@ export function GameSetup({
       winningScore: hasScoreTarget ? scoreTarget : undefined,
       rematchOf,
     });
-    router.replace(`/games/${slug}/${session.id}`);
+    navigateScorekeeper(`/games/${slug}/${session.id}`, true);
   };
 
   const pirateConfig = (players: Player[]) => {
@@ -152,13 +150,13 @@ export function GameSetup({
   return (
     <main className="felt flex flex-1 flex-col items-center px-5 py-10">
       <header className="mb-8 flex w-full max-w-md items-center gap-3">
-        <Link
+        <ScorekeeperLink
           href={backHref}
           className="rounded-full px-2 py-1 text-2xl text-white/70 transition hover:text-white"
           aria-label="Back"
         >
           ←
-        </Link>
+        </ScorekeeperLink>
         <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
           <span aria-hidden>{SUIT_SYMBOL[suit]}</span>
           {title}
