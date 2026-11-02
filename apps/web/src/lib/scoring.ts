@@ -74,7 +74,7 @@ export function gabongHundredHits(
 /** Default target for a 500 game when a session predates the slider. */
 export const DEFAULT_WINNING_SCORE = 500;
 
-/** Default losing limit for Jona's spil. */
+/** Default losing limit for Den største taber. */
 export const DEFAULT_JONAS_SCORE_LIMIT = 100;
 
 export function defaultScoreTarget(slug: string): number {
@@ -112,7 +112,7 @@ export function computeStandings(
     return { totals, finished, winnerIds: [], loserIds };
   }
 
-  // 500, Jona's spil, and Pirate Bridge: totals are simple sums.
+  // 500, Den største taber, and Pirate Bridge: totals are simple sums.
   for (const round of rounds) {
     for (const id of ids) totals[id] += round.scores[id] ?? 0;
   }

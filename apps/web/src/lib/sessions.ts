@@ -12,7 +12,7 @@ export interface GameSession {
   status: GameStatus;
   createdAt: number;
   updatedAt: number;
-  /** Score target for 500 (wins) or Jona's spil (loses). */
+  /** Score target for 500 (wins) or Den største taber (loses). */
   winningScore?: number;
   /**
    * Position in a rematch chain: 1 for the first rematch, 2 for a rematch of
@@ -93,7 +93,7 @@ export interface CreateSessionOptions {
   players: Player[];
   /** Pirate Bridge only: cards dealt in the first round (= round count). */
   startCards?: number;
-  /** 500 / Jona's spil only: the score that ends the game. */
+  /** 500 / Den største taber only: the score that ends the game. */
   winningScore?: number;
   /** The finished session this is a rematch of, if any. */
   rematchOf?: GameSession;

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { navigateScorekeeper, ScorekeeperLink } from "./ScorekeeperLink";
 import { SUIT_SYMBOL, type Suit } from "@/lib/games";
 import {
   computeStandings,
@@ -45,7 +44,6 @@ export function GameScreen({
   suit: Suit;
   sessionId: string;
 }) {
-  const router = useRouter();
   const [session, setSession] = useState<GameSession | null | undefined>(
     undefined
   );
@@ -65,20 +63,20 @@ export function GameScreen({
     return (
       <main className="felt flex flex-1 flex-col items-center justify-center gap-4 px-5 text-center">
         <p className="text-white/80">This game could not be found.</p>
-        <Link
+        <ScorekeeperLink
           href={`/games/${slug}`}
           className="game-card rounded-xl px-5 py-3 font-semibold text-white"
         >
           ← Back to {gameName}
-        </Link>
+        </ScorekeeperLink>
       </main>
     );
   }
 
   const { players, rounds } = session;
   const isPirate = slug === "piratbridge";
-  const isJonas = slug === "jonas-spil";
-  const lowerIsBetter = slug === "gabong" || isJonas;
+  const isBiggestLoser = slug === "jonas-spil";
+  const lowerIsBetter = slug === "gabong" || isBiggestLoser;
   const scoreTarget = session.winningScore ?? defaultScoreTarget(slug);
   const standings = computeStandings(slug, players, rounds, scoreTarget);
   const finished = session.status === "finished";
@@ -89,7 +87,7 @@ export function GameScreen({
     players.every((p) => p.id in round.scores);
 
   const recomputeStatus = (rs: Round[]): GameStatus => {
-    if (slug === "500" || slug === "gabong" || isJonas) {
+    if (slug === "500" || slug === "gabong" || isBiggestLoser) {
       return computeStandings(slug, players, rs, scoreTarget).finished
         ? "finished"
         : "active";
@@ -108,7 +106,7 @@ export function GameScreen({
         highlightIds: s.loserIds,
       };
     }
-    if (isJonas) {
+    if (isBiggestLoser) {
       if (!s.loserIds.length) return null;
       return {
         emoji: "💥",
@@ -165,11 +163,11 @@ export function GameScreen({
   const rename = (name: string) =>
     setSession(upsertSession({ ...session, name }));
   const startRematch = () =>
-    router.push(`/games/${slug}/${session.id}/rematch`);
+    navigateScorekeeper(`/games/${slug}/${session.id}/rematch`);
   const removeGame = () => {
     if (!window.confirm("Delete this game?")) return;
     deleteSession(session.id);
-    router.replace(`/games/${slug}`);
+    navigateScorekeeper(`/games/${slug}`, true);
   };
 
   // Ordered leaderboard
@@ -186,7 +184,7 @@ export function GameScreen({
   if (finished) {
     if (slug === "gabong") {
       banner = `💥 ${[...losers].map(nameOf).join(", ")} busted — game over`;
-    } else if (isJonas) {
+    } else if (isBiggestLoser) {
       banner = `💥 ${[...losers].map(nameOf).join(", ")} reached ${scoreTarget} — game over`;
     } else {
       banner = `👑 ${standings.winnerIds.map(nameOf).join(", ")} ${
@@ -195,7 +193,7 @@ export function GameScreen({
     }
   } else if (slug === "500") {
     banner = `First to ${scoreTarget} wins`;
-  } else if (isJonas) {
+  } else if (isBiggestLoser) {
     banner = `First to ${scoreTarget} loses`;
   } else if (slug === "gabong") {
     banner = "Avoid hitting 500 — that player loses";
@@ -221,13 +219,13 @@ export function GameScreen({
   return (
     <main className="felt flex flex-1 flex-col items-center px-5 py-8">
       <header className="mb-4 flex w-full max-w-md items-center gap-3">
-        <Link
+        <ScorekeeperLink
           href={`/games/${slug}`}
           className="rounded-full px-2 py-1 text-2xl text-white/70 transition hover:text-white"
           aria-label="Back"
         >
           ←
-        </Link>
+        </ScorekeeperLink>
         <span className="text-2xl" aria-hidden>
           {SUIT_SYMBOL[suit]}
         </span>
@@ -375,12 +373,12 @@ export function GameScreen({
           hint={
             slug === "500"
               ? "Points are multiples of 5 (negatives allowed)."
-              : isJonas
+              : isBiggestLoser
                 ? "Add the points gained this round."
               : undefined
           }
           initial={editingScores}
-          allowNegative={!isJonas}
+          allowNegative={!isBiggestLoser}
           onSave={(scores) =>
             editing === "new" ? addRound(scores) : saveRound(editing.index, scores)
           }
